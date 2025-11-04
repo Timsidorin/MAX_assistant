@@ -11,7 +11,7 @@ class Configs(BaseSettings):
 
     # ------------ Веб-сервер ------------
     HOST: str = "localhost"
-    PORT: int = 8002
+    PORT: int = 8005
 
     # ------------ БД ------------
     DB_HOST: Optional[str] = Field(default="localhost", env="DB_HOST")
