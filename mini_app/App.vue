@@ -1,10 +1,7 @@
-<script setup>
-
-</script>
-
 <template>
+
 </template>
 
-<style scoped>
+<script>
 
-</style>
+</script>
