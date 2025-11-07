@@ -8,5 +8,9 @@ export default defineConfig({
         alias: {
             '@assets' : path.resolve(__dirname, './assets'),
         }
+    },
+    //для разработки внутри мини аппы
+    server: {
+        allowedHosts: ['creakily-patient-eland.cloudpub.ru']
     }
 })

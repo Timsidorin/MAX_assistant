@@ -207,4 +207,4 @@ marimo/_lsp/
 __marimo__/
 
 .idea
-mini_app/node_modules
+web_camera/node_modules
