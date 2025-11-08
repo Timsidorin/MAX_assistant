@@ -9,7 +9,7 @@ const videoElement = ref(null);
 const mediaStream = ref(null);
 const cameraAccess = ref(false);
 
-const startCamera = async () => {
+const renderCamera = async () => {
   try {
     if (mediaStream.value) {
       stopCamera();
@@ -18,8 +18,8 @@ const startCamera = async () => {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: 'environment',
-        width: { ideal: 1920 },
-        height: { ideal: 1080 }
+        width: { min: 1024, ideal: 1920, max: 1920 },
+        height: { min: 776, ideal: 1080, max: 1080 }
       },
       audio: false
     });
@@ -49,22 +49,21 @@ const stopCamera = () => {
 // Сделать снимок
 const capturePhoto = () => {
   if (!videoElement.value || !mediaStream.value) {
-    throw new Error('Камера не активна')
+    throw new Error('Камера не активна');
   }
 
-  const video = videoElement.value
-  const canvas = document.createElement('canvas')
-  const context = canvas.getContext('2d')
+  const video = videoElement.value;
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
 
-  canvas.width = video.videoWidth
-  canvas.height = video.videoHeight
-  context.drawImage(video, 0, 0, canvas.width, canvas.height)
-
-  return canvas.toDataURL('image/png')
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  context.drawImage(video, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL();
 }
 
 onMounted(() => {
-  startCamera();
+  renderCamera();
 })
 
 onUnmounted(() => {
@@ -72,7 +71,7 @@ onUnmounted(() => {
 })
 
 defineExpose({
-  startCamera,
+  renderCamera,
   stopCamera,
   capturePhoto
 });

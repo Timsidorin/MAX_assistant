@@ -1,13 +1,21 @@
 <template>
-  <el-segmented v-model="value" :options="options" size="large" />
+  <el-segmented v-model="value" :options="options" size="large"/>
 </template>
 
 <script setup>
-import { ref } from 'vue'
 
-const value = ref('Фото')
+const value = defineModel();
 
-const options = ['Фото', 'Видео']
+let options = [
+  {
+    value: 'photo',
+    label: 'Фото'
+  },
+  {
+    value: 'video',
+    label: 'Видео'
+  }
+]
 </script>
 
 <style scoped>

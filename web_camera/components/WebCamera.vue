@@ -1,8 +1,9 @@
 <template>
-  <camera-preview/>
+  <camera-preview ref="camera"/>
   <div class="container-switch-camera-mode">
-    <photo-button class="camera-button"/>
-    <switch-camera-mode class="switch-camera-mode"/>
+    <photo-button @take-photo="takePhoto" :camera-mode="cameraMode" class="camera-button"/>
+    <switch-camera-mode v-model="cameraMode" class="switch-camera-mode"/>
+    <media-store :elements="mediaStore" class="media-store"/>
   </div>
 </template>
 
@@ -10,6 +11,17 @@
 import SwitchCameraMode from "./camera-components/SwitchCameraMode.vue";
 import PhotoButton from "./camera-components/PhotoButton.vue";
 import CameraPreview from "./camera-components/CameraPreview.vue";
+import MediaStore from "./camera-components/MediaStore.vue";
+import {ref} from "vue";
+
+const cameraMode = ref('photo');
+const camera = ref(null);
+const mediaStore = ref([]);
+
+function takePhoto() {
+  const newPhoto = camera.value.capturePhoto();
+  mediaStore.value.push(newPhoto);
+}
 </script>
 
 <style scoped>
@@ -32,5 +44,10 @@ import CameraPreview from "./camera-components/CameraPreview.vue";
   margin-left: auto;
   margin-right: auto;
   margin-bottom: 5%;
+}
+
+.media-store {
+  margin-left: auto;
+  margin-right: 10%;
 }
 </style>
