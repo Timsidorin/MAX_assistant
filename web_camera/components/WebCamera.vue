@@ -3,25 +3,41 @@
   <div class="container-switch-camera-mode">
     <photo-button @take-photo="takePhoto" :camera-mode="cameraMode" class="camera-button"/>
     <switch-camera-mode v-model="cameraMode" class="switch-camera-mode"/>
-    <media-store :elements="mediaStore" class="media-store"/>
+    <media-store @click="dialogVisible = !dialogVisible" :elements="mediaStore" class="media-store"/>
+    <dialog-preview :elements="mediaStore" v-model="dialogVisible"/>
   </div>
 </template>
 
 <script setup>
+import DialogPreview from "./send-request-components/DialogPreview.vue";
 import SwitchCameraMode from "./camera-components/SwitchCameraMode.vue";
 import PhotoButton from "./camera-components/PhotoButton.vue";
 import CameraPreview from "./camera-components/CameraPreview.vue";
 import MediaStore from "./camera-components/MediaStore.vue";
-import {ref} from "vue";
+import {ref, provide} from "vue";
 
+const dialogVisible = ref(false);
 const cameraMode = ref('photo');
 const camera = ref(null);
 const mediaStore = ref([]);
 
 function takePhoto() {
   const newPhoto = camera.value.capturePhoto();
-  mediaStore.value.push(newPhoto);
+  let obj = {
+    id: mediaStore.value.length + 1,
+    url: newPhoto,
+  };
+  mediaStore.value.push(obj);
 }
+
+function deleteElement(id) {
+  mediaStore.value = mediaStore.value.filter((element) => {
+    return element.id !== id;
+  });
+
+}
+
+provide('deleteElement', deleteElement);
 </script>
 
 <style scoped>
