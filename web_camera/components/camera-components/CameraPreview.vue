@@ -62,6 +62,11 @@ const capturePhoto = () => {
   return canvas.toDataURL();
 }
 
+const startVideo = async () => {
+  const stream = await navigator.mediaDevices.getUserMedia({
+
+  })
+}
 onMounted(() => {
   renderCamera();
 })

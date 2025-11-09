@@ -1,14 +1,18 @@
 <template>
   <el-dialog v-model="model" fullscreen>
     <photo-list :url-list="urlList" v-if="elements.length > 0" :elements="elements"/>
-    <el-button @click="sendMedias" class="button-send-media" type="primary" plain>Отправить</el-button>
     <dialog-processed-media v-if="dataAnswer" :data-answer="dataAnswer" v-model="message"/>
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button @click="sendMedias" class="button-send-media" type="primary" plain>Обработать</el-button>
+      </div>
+    </template>
   </el-dialog>
 </template>
 
 <script setup>
 import PhotoList from "./PhotoList.vue";
-import {computed, onMounted, ref} from "vue";
+import {computed, ref} from "vue";
 import {downloadMedias} from "@api/MediaDownload.js";
 import {getLocation} from "@helpers/gps.js";
 import {ElLoading} from 'element-plus'
@@ -36,7 +40,6 @@ async function sendMedias() {
     text: 'Обработка нейросетью',
     background: 'primary',
   });
-
   try {
     dataAnswer.value = await downloadMedias(data);
     message.value = true;
@@ -50,10 +53,9 @@ async function sendMedias() {
 
 <style scoped>
 .button-send-media {
-  position: sticky;
-  left: 100%;
-  z-index: 99;
-  margin-top: 20px;
+  display: block;
+  margin-left: auto;
+  margin-top: 50px
 }
 
 </style>
