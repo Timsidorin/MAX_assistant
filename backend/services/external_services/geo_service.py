@@ -1,35 +1,63 @@
-import asyncio
 import os
-from dotenv import load_dotenv
 import httpx
+from typing import Optional
+from dotenv import load_dotenv
 
-load_dotenv("../../../.env")
-api_key = os.getenv("DADATA_API_KEY")
-
-
-
-
-async def geocode_coordinates(coordinates: dict) -> str:
-    """
-    Выполняет обратное геокодирование
-    :param coordinates: широта, долгота
-    :return: ближайший адрес в формате строки
-    """
-    url = "https://suggestions.dadata.ru/suggestions/api/4_1/rs/geolocate/address"
-    api_key = os.getenv("DADATA_API_KEY")
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            url=url,
-            headers={
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-                "Authorization": f"Token {api_key}"
-            },
-            json=coordinates
-        )
-        return response.json()["suggestions"][0]["value"]
+load_dotenv()
 
 
-if __name__ == "__main__":
-    address = asyncio.run(geocode_coordinates(coordinates={ "lat": 50.543259, "lon": 137.012984 }))
-    print(address)
+class GeocodingService:
+    """Сервис для работы с геокодированием через DaData"""
+    def __init__(self):
+        self.api_key = os.getenv("DADATA_API_KEY")
+        if not self.api_key:
+            print("DADATA_API_KEY не найден в .env")
+        self.url = "https://suggestions.dadata.ru/suggestions/api/4_1/rs/geolocate/address"
+
+    async def geocode_coordinates(self, latitude: str, longitude: str) -> Optional[str]:
+        """
+        Выполняет обратное геокодирование (координаты -> адрес)
+        """
+        if not self.api_key:
+            return None
+
+        try:
+            lat = float(latitude)
+            lon = float(longitude)
+
+            coordinates = {"lat": lat, "lon": lon}
+
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(
+                    url=self.url,
+                    headers={
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                        "Authorization": f"Token {self.api_key}"
+                    },
+                    json=coordinates
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get("suggestions") and len(data["suggestions"]) > 0:
+                        address = data["suggestions"][0]["value"]
+                        return address
+                    else:
+                        return None
+                else:
+                    return None
+        except Exception as e:
+            print(f"❌ Ошибка геокодирования: {e}")
+            return None
+
+    async def get_address_or_coordinates(
+            self,
+            latitude: str,
+            longitude: str
+    ) -> tuple[Optional[str], str, str]:
+        """
+        Получает адрес или возвращает координаты в случае ошибки
+        """
+        address = await self.geocode_coordinates(latitude, longitude)
+        return address, latitude, longitude

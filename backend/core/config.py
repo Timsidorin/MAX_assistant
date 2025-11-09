@@ -17,7 +17,7 @@ class Configs(BaseSettings):
     DB_HOST: Optional[str] = Field(default="localhost", env="DB_HOST")
     DB_PORT: Optional[int] = Field(default=5432, env="DB_PORT")
     DB_USER: Optional[str] = Field(default="postgres", env="DB_USER")
-    DB_NAME: Optional[str] = Field(default="postgres", env="DB_NAME")
+    DB_NAME: Optional[str] = Field(default="MAX", env="DB_NAME")
     DB_PASS: Optional[str] = Field(default="admin", env="DB_PASS")
 
     # ------------ Почта (оповещение) ------------
@@ -37,16 +37,16 @@ class Configs(BaseSettings):
 
     # ------------ S3 хранилище ----------------------------------------
     AWS_ACCESS_KEY_ID: Optional[str] = Field(
-        default="ASBZAQIUA7VOLQU0DDTD", env="AWS_ACCESS_KEY_ID"
+        default="PBZ2LEBQ3L0Q9PE7N7YY", env="AWS_ACCESS_KEY_ID"
     )
     AWS_SECRET_ACCESS_KEY: Optional[str] = Field(
-        default="GFsM7bTRHbQ4CoZVDCmKsP19Lt8FN0ipQpl5OnTM", env="AWS_SECRET_ACCESS_KEY"
+        default="QAjuuUc2Xwwq7rggsNnvXNcnywwXWQ3tNSRS1FNi", env="AWS_SECRET_ACCESS_KEY"
     )
     S3_BUCKET_NAME: Optional[str] = Field(
-        default="d08d3831-edc9b373-5fab-42f0-9e2f-441c90348394", env="S3_BUCKET_NAME"
+        default="ec4f5e2a-70163ded-082f-4975-95f1-f0b1bf534bf0", env="S3_BUCKET_NAME"
     )
     S3_ENDPOINT_URL: Optional[str] = Field(
-        default="https://s3.twcstorage.ru/", env="S3_ENDPOINT_URL"
+        default="https://s3.twcstorage.ru", env="S3_ENDPOINT_URL"
     )
     S3_REGION_NAME: Optional[str] = Field(default="ru-1", env="S3_REGION_NAME")
 
