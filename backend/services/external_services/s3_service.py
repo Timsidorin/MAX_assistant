@@ -1,92 +1,123 @@
-from fastapi import Depends, HTTPException
-import boto3
-import uuid
-from datetime import datetime
-from botocore.config import Config
-import os
+import aioboto3
+import asyncio
 from typing import Optional
+from datetime import datetime
+import uuid
+from io import BytesIO
 
-from pydantic import UUID4
-from sqlalchemy.ext.asyncio import AsyncSession
-from core.config import configs
-import mimetypes
-import hashlib
-import base64
-
+from backend.core.config import configs
 
 
 class S3Service:
-    def __init__(
-        self,
-        session: AsyncSession,
-        aws_access_key_id: str = configs.AWS_ACCESS_KEY_ID,
-        aws_secret_access_key: str = configs.AWS_SECRET_ACCESS_KEY,
-        region_name: str = configs.S3_REGION_NAME,
-        bucket_name: str = configs.S3_BUCKET_NAME,
-        endpoint_url: str = configs.S3_ENDPOINT_URL,
+    """Сервис для работы с S3"""
 
-
-    ):
-
-        self.s3_client = boto3.client(
-            "s3",
-            aws_access_key_id=aws_access_key_id,
-            aws_secret_access_key=aws_secret_access_key,
-            region_name=region_name,
-            endpoint_url=endpoint_url,
+    def __init__(self):
+        self.session = aioboto3.Session(
+            aws_access_key_id=configs.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=configs.AWS_SECRET_ACCESS_KEY,
+            region_name=configs.S3_REGION_NAME
         )
-        self.bucket_name = bucket_name
-        self.endpoint_url = endpoint_url
+        self.bucket_name = configs.S3_BUCKET_NAME
+        self.endpoint_url = configs.S3_ENDPOINT_URL
 
-    def generate_unique_filename(self, original_filename: str) -> str:
-        """Генерирует уникальное имя файла на основе оригинального имени и временной метки"""
-        extension = original_filename.split(".")[-1] if "." in original_filename else ""
-        unique_id = str(uuid.uuid4())
-        return f"photos/{unique_id}.{extension}"
+    async def upload_file(
+            self,
+            file_bytes: bytes,
+            folder: str = "processed",
+            filename: Optional[str] = None,
+            content_type: str = "image/jpeg"
+    ) -> str:
+        """
+        Загрузка файла в S3
 
-    async def upload_file(self, file_content: bytes, object_name: str, training_uuid: UUID4) -> str:
-        """Загружает файл в S3, сохраняет в БД и возвращает URL"""
-        content_type, _ = mimetypes.guess_type(object_name)
-        if content_type is None:
-            content_type = "application/octet-stream"
+        Args:
+            file_bytes: Байты файла
+            folder: Папка в S3 (processed, videos, etc.)
+            filename: Имя файла (если None, генерируется автоматически)
+            content_type: MIME-тип файла
 
-        try:
-            sha256_hash = hashlib.sha256(file_content).digest()
-            sha256_hash_b64 = base64.b64encode(sha256_hash).decode("utf-8")
-            self.s3_client.put_object(
-                Bucket=self.bucket_name,
-                Key=object_name,
-                Body=file_content,
-                ContentType=content_type,
-                ChecksumSHA256=sha256_hash_b64,
-            )
-            file_url = (
-                f"{self.endpoint_url.rstrip('/')}/{self.bucket_name}/{object_name}"
-            )
+        Returns:
+            URL загруженного файла
+        """
+        if filename is None:
+            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            unique_id = str(uuid.uuid4())[:8]
+            ext = "jpg" if "image" in content_type else "mp4"
+            filename = f"{timestamp}_{unique_id}.{ext}"
 
-            return file_url
-        except Exception as e:
-            print(f"Ошибка при загрузке файла: {str(e)}")
-            raise e
+        s3_key = f"{folder}/{filename}"
 
+        async with self.session.client(
+                "s3",
+                endpoint_url=self.endpoint_url
+        ) as s3:
+            try:
+                file_obj = BytesIO(file_bytes)
 
+                await s3.upload_fileobj(
+                    file_obj,
+                    self.bucket_name,
+                    s3_key,
+                    ExtraArgs={
+                        'ContentType': content_type,
+                        'ACL': 'public-read'
+                    }
+                )
 
+                # Формируем URL
+                if self.endpoint_url:
+                    file_url = f"{self.endpoint_url}/{self.bucket_name}/{s3_key}"
+                else:
+                    file_url = f"https://{self.bucket_name}.s3.{configs.S3_REGION_NAME}.amazonaws.com/{s3_key}"
 
-    async def delete_file(self, object_name: str):
-        key = "/".join(object_name.split("/photos/")[-1].split("/"))
-        object_name = f"photos/{key}"
-        print(f"Attempting to delete object: {object_name}")
-        try:
-            response = self.s3_client.delete_objects(
-                Bucket=self.bucket_name,
-                Delete={'Objects': [{'Key': object_name}]}
-            )
-            if 'Deleted' in response:
+                return file_url
+
+            except Exception as e:
+                print(f"❌ Ошибка загрузки в S3: {e}")
+                raise
+
+    async def delete_file(self, s3_key: str) -> bool:
+        """
+        Удаление файла из S3
+
+        Args:
+            s3_key: Ключ файла в S3
+
+        Returns:
+            True если успешно удалено
+        """
+        async with self.session.client(
+                "s3",
+                endpoint_url=self.endpoint_url
+        ) as s3:
+            try:
+                await s3.delete_object(Bucket=self.bucket_name, Key=s3_key)
                 return True
-            else:
-                raise HTTPException(status_code=404, detail="Файл не удалён")
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Ошибка при удалении файла: {str(e)}")
+            except Exception as e:
+                print(f"❌ Ошибка удаления из S3: {e}")
+                return False
 
+    async def check_bucket_exists(self) -> bool:
+        """Проверка существования bucket"""
+        async with self.session.client(
+                "s3",
+                endpoint_url=self.endpoint_url
+        ) as s3:
+            try:
+                await s3.head_bucket(Bucket=self.bucket_name)
+                return True
+            except:
+                return False
 
-
+    async def create_bucket_if_not_exists(self):
+        """Создание bucket если не существует"""
+        async with self.session.client(
+                "s3",
+                endpoint_url=self.endpoint_url
+        ) as s3:
+            try:
+                if not await self.check_bucket_exists():
+                    await s3.create_bucket(Bucket=self.bucket_name)
+                    print(f"✅ Bucket {self.bucket_name} создан")
+            except Exception as e:
+                print(f"❌ Ошибка создания bucket: {e}")
