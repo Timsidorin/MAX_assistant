@@ -309,13 +309,19 @@ class PotholeDetectionService:
         results = []
         successful = 0
         failed = 0
+
+        # Создаем задачи для параллельной обработки
         tasks = []
         for idx, (image_bytes, filename) in enumerate(images_data):
             task = self._process_single_image_task(
                 image_bytes, filename, idx, input_data
             )
             tasks.append(task)
+
+        # Выполняем все задачи параллельно
         task_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Собираем результаты
         for result in task_results:
             if isinstance(result, Exception):
                 results.append(SingleImageResult(
@@ -334,10 +340,13 @@ class PotholeDetectionService:
                     successful += 1
                 else:
                     failed += 1
+
+        print(f"🌍 Запрашиваем адрес для координат: {input_data.latitude}, {input_data.longitude}")
         address = await self.geocoding_service.geocode_coordinates(
             latitude=input_data.latitude,
             longitude=input_data.longitude
         )
+        print(f"📍 Получен адрес: {address}")
 
         return MultipleDetectionResponse(
             total_images=len(images_data),

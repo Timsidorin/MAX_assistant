@@ -76,20 +76,6 @@ async def detect_multiple_images(
         payload: MultipleImagesBase64Input,
         db: AsyncSession = Depends(get_async_session)
 ):
-    """
-    Обработка нескольких изображений из base64 строк
-
-    Пример payload:
-    {
-        "images_base64": [
-            "/9j/4AAQSkZJRgABAQAAAQABAAD...",
-            "/9j/4AAQSkZJRgABAQAAAQABAAD..."
-        ],
-        "user_id": "user123",
-        "latitude": "55.7558",
-        "longitude": "37.6173"
-    }
-    """
     try:
         if not payload.images_base64:
             raise HTTPException(status_code=400, detail="Не передано ни одного изображения")
@@ -124,7 +110,6 @@ async def detect_multiple_images(
             input_data=payload,
             db=db
         )
-
         return result
 
     except HTTPException as he:
