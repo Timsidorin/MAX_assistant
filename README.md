@@ -1,10 +1,14 @@
 # MAX_assistant
 
+<div align="center">
+  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/Max_logo_2025.png/600px-Max_logo_2025.png" alt="MAX Logo" width="200"/>
+</div>
 
 ![AI Project](https://img.shields.io/badge/AI-DecodeMAX-blue) 
 ![Python](https://img.shields.io/badge/Python-3.10-green) 
 ![FastAPI](https://img.shields.io/badge/FastAPI-API-red) 
 ![Docker](https://img.shields.io/badge/Docker-Ready-blue)
+
 ## 📋 О проекте
 
 DecodeMAX — это комплексное решение для обработки и анализа данных, построенное на современных технологиях машинного обучения и микросервисной архитектуре.
@@ -39,6 +43,3 @@ DecodeMAX — это комплексное решение для обработ
 
 ### Шаг 1: Клонирование репозитория
 
-```bash
-git clone https://github.com/Timsidorin/LCT2025_DecodeAI.git
-cd LCT2025_DecodeAI
