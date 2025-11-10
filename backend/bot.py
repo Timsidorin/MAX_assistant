@@ -15,7 +15,7 @@ from maxapi.types import (
     MessageCallback,
     Attachment,
     LinkButton,
-    CallbackButton,
+    CallbackButton, OpenAppButton,
 )
 
 from backend.depends import get_user_service
@@ -72,6 +72,7 @@ async def start_command(event: MessageCreated):
     user_id = event.from_user.user_id
     first_name = event.from_user.first_name
     last_name = event.from_user.last_name or "Unknown"
+    event.from_user
 
     is_new_user = await register_or_get_user(
         max_user_id=user_id,
@@ -93,9 +94,9 @@ async def start_command(event: MessageCreated):
 
     builder = InlineKeyboardBuilder()
     builder.row(
-        LinkButton(
-            text="Открыть сканер",
-            url=f"https://creakily-patient-eland.cloudpub.ru/?user_id={user_id}",
+        OpenAppButton(
+            text="Открыть приложение",
+            web_app=f"https://max.ru/t86_hakaton_bot?startapp",
         )
     )
     builder.row(
