@@ -1,9 +1,10 @@
-import {BottomToolBar} from "./layout/BottomToolBar.jsx";
+import {RouterProvider} from "react-router/dom";
+import {router} from "./router/index.jsx";
 
 export function App() {
     return (
         <>
-            <BottomToolBar/>
+            <RouterProvider router={router}/>
         </>
     );
 }

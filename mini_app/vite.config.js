@@ -6,11 +6,13 @@ export default defineConfig({
     plugins: [react()],
     resolve: {
         alias: {
-            '@assets' : path.resolve(__dirname, './assets'),
+            '@components' : path.resolve(__dirname, './components'),
+            '@styles' : path.resolve(__dirname, './styles'),
         }
     },
     define: {
-        __BASE__PYTHON__URL__: JSON.stringify('https://zestfully-champion-parakeet.cloudpub.ru')
+        __BASE__PYTHON__URL__: JSON.stringify('https://zestfully-champion-parakeet.cloudpub.ru'),
+        __BASE__SCANNER__URL__: JSON.stringify('https://untimely-eligible-pheasant.cloudpub.ru'),
     },
     //для разработки внутри мини аппы
     server: {
