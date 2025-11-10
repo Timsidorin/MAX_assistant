@@ -1,13 +1,17 @@
-# MAX_assistant
+# MAX_ReportAssistant
 
+<div align="center">
+  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/Max_logo_2025.png/600px-Max_logo_2025.png" alt="MAX Logo" width="200"/>
+</div>
 
-![AI Project](https://img.shields.io/badge/AI-DecodeAI-blue) 
+![AI Project](https://img.shields.io/badge/AI-DecodeMAX-blue) 
 ![Python](https://img.shields.io/badge/Python-3.10-green) 
 ![FastAPI](https://img.shields.io/badge/FastAPI-API-red) 
 ![Docker](https://img.shields.io/badge/Docker-Ready-blue)
+
 ## 📋 О проекте
 
-LCT2025_DecodeAI — это комплексное решение для обработки и анализа данных, построенное на современных технологиях машинного обучения и микросервисной архитектуре.
+MAX_ReportAssistant — это комплексное решение для обработки и анализа данных, построенное на современных технологиях машинного обучения и микросервисной архитектуре.
 
 [📚 Документация проекта](https://decodeai.yonote.ru/share/1cbf8e09-f53c-4211-acd0-742c9c5edb75)
 
@@ -39,6 +43,3 @@ LCT2025_DecodeAI — это комплексное решение для обр�
 
 ### Шаг 1: Клонирование репозитория
 
-```bash
-git clone https://github.com/Timsidorin/LCT2025_DecodeAI.git
-cd LCT2025_DecodeAI
