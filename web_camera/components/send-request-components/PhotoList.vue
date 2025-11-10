@@ -1,5 +1,5 @@
 <template>
-  <el-scrollbar always height="500px">
+  <el-scrollbar always max-height="500px">
     <div style="display: flex; flex-direction: row; gap: 10px; flex-wrap: wrap">
       <el-image
           class="element"
