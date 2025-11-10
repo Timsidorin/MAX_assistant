@@ -1,4 +1,4 @@
-# MAX_assistant
+# MAX_ReportAssistant
 
 <div align="center">
   <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/Max_logo_2025.png/600px-Max_logo_2025.png" alt="MAX Logo" width="200"/>
