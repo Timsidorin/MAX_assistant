@@ -1,5 +1,5 @@
 import aioboto3
-import asyncio
+from botocore.config import Config
 from typing import Optional
 from datetime import datetime
 import uuid
@@ -12,6 +12,12 @@ class S3Service:
     """Сервис для работы с S3"""
 
     def __init__(self):
+        self.config = Config(
+            s3={'addressing_style': 'virtual'},
+            request_checksum_calculation="when_required",
+            response_checksum_validation=None
+        )
+
         self.session = aioboto3.Session(
             aws_access_key_id=configs.AWS_ACCESS_KEY_ID,
             aws_secret_access_key=configs.AWS_SECRET_ACCESS_KEY,
@@ -29,13 +35,6 @@ class S3Service:
     ) -> str:
         """
         Загрузка файла в S3
-
-        Args:
-            file_bytes: Байты файла
-            folder: Папка в S3 (processed, videos, etc.)
-            filename: Имя файла (если None, генерируется автоматически)
-            content_type: MIME-тип файла
-
         Returns:
             URL загруженного файла
         """
@@ -49,7 +48,8 @@ class S3Service:
 
         async with self.session.client(
                 "s3",
-                endpoint_url=self.endpoint_url
+                endpoint_url=self.endpoint_url,
+                config=self.config
         ) as s3:
             try:
                 file_obj = BytesIO(file_bytes)
@@ -59,17 +59,15 @@ class S3Service:
                     self.bucket_name,
                     s3_key,
                     ExtraArgs={
-                        'ContentType': content_type,
-                        'ACL': 'public-read'
+                        'ContentType': content_type
                     }
                 )
-
-                # Формируем URL
-                if self.endpoint_url:
-                    file_url = f"{self.endpoint_url}/{self.bucket_name}/{s3_key}"
-                else:
-                    file_url = f"https://{self.bucket_name}.s3.{configs.S3_REGION_NAME}.amazonaws.com/{s3_key}"
-
+                await s3.put_object_acl(
+                    Bucket=self.bucket_name,
+                    Key=s3_key,
+                    ACL='public-read'
+                )
+                file_url = f"https://{self.bucket_name}.hb.ru-msk.vkcloud-storage.ru/{s3_key}"
                 return file_url
 
             except Exception as e:
@@ -79,29 +77,26 @@ class S3Service:
     async def delete_file(self, s3_key: str) -> bool:
         """
         Удаление файла из S3
-
-        Args:
-            s3_key: Ключ файла в S3
-
         Returns:
             True если успешно удалено
         """
         async with self.session.client(
                 "s3",
-                endpoint_url=self.endpoint_url
+                endpoint_url=self.endpoint_url,
+                config=self.config
         ) as s3:
             try:
                 await s3.delete_object(Bucket=self.bucket_name, Key=s3_key)
                 return True
             except Exception as e:
-                print(f"❌ Ошибка удаления из S3: {e}")
                 return False
 
     async def check_bucket_exists(self) -> bool:
         """Проверка существования bucket"""
         async with self.session.client(
                 "s3",
-                endpoint_url=self.endpoint_url
+                endpoint_url=self.endpoint_url,
+                config=self.config
         ) as s3:
             try:
                 await s3.head_bucket(Bucket=self.bucket_name)
@@ -113,7 +108,8 @@ class S3Service:
         """Создание bucket если не существует"""
         async with self.session.client(
                 "s3",
-                endpoint_url=self.endpoint_url
+                endpoint_url=self.endpoint_url,
+                config=self.config
         ) as s3:
             try:
                 if not await self.check_bucket_exists():
@@ -121,3 +117,45 @@ class S3Service:
                     print(f"✅ Bucket {self.bucket_name} создан")
             except Exception as e:
                 print(f"❌ Ошибка создания bucket: {e}")
+
+    async def make_bucket_public(self):
+        """
+        Делает весь bucket публичным (опционально)
+        """
+        async with self.session.client(
+                "s3",
+                endpoint_url=self.endpoint_url,
+                config=self.config
+        ) as s3:
+            try:
+                await s3.put_bucket_acl(
+                    Bucket=self.bucket_name,
+                    ACL='public-read'
+                )
+            except Exception as e:
+                print(f"❌ Ошибка настройки ACL bucket: {e}")
+
+    async def list_files(self, prefix: str = "") -> list:
+        """
+        Получить список файлов в bucket
+
+        Returns:
+            Список ключей файлов
+        """
+        async with self.session.client(
+                "s3",
+                endpoint_url=self.endpoint_url,
+                config=self.config
+        ) as s3:
+            try:
+                response = await s3.list_objects_v2(
+                    Bucket=self.bucket_name,
+                    Prefix=prefix
+                )
+
+                if 'Contents' in response:
+                    return [obj['Key'] for obj in response['Contents']]
+                return []
+            except Exception as e:
+                print(f"❌ Ошибка получения списка файлов: {e}")
+                return []

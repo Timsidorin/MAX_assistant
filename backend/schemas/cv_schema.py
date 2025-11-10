@@ -77,7 +77,7 @@ class DetectionResponse(BaseModel):
 
 
 class SingleImageResult(BaseModel):
-    """Результат обработки одного изображения"""
+    """Результат обработки одного изображения в батче"""
     filename: str
     index: int
     detections: SeverityStats
