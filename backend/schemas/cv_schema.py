@@ -64,6 +64,7 @@ class SeverityStats(BaseModel):
 
 class DetectionResponse(BaseModel):
     """Ответ при обработке одного изображения"""
+    user_id: str
     filename: str
     detections: SeverityStats
     average_risk: float
@@ -90,6 +91,7 @@ class SingleImageResult(BaseModel):
 
 class MultipleDetectionResponse(BaseModel):
     """Ответ при обработке нескольких изображений"""
+    user_id: str
     total_images: int
     successful: int
     failed: int
