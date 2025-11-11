@@ -13,6 +13,7 @@
     "@maxhub/max-ui": "^0.1.12",
     "@siberiacancode/reactuse": "^0.3.2",
     "@vitejs/plugin-react": "^5.1.0",
+    "axios": "^1.13.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hot-toast": "^2.6.0",

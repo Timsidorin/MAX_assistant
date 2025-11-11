@@ -5,8 +5,7 @@ import {ScannerModal} from "@components/createPage/ScannerButton.jsx";
 export function WhatIsScanner() {
     const [isModalOpen, setIsModalOpen] = useState(false);
 
-    const openModal = () => setIsModalOpen(true);
-    const closeModal = () => setIsModalOpen(false);
+    const openModal = () => setIsModalOpen(!isModalOpen);
 
     return (
         <>
@@ -14,7 +13,7 @@ export function WhatIsScanner() {
                 Что такое сканер?
             </Button>
 
-            <ScannerModal isOpen={isModalOpen} onClose={closeModal} />
+            <ScannerModal isOpen={isModalOpen} onClose={openModal} />
         </>
     );
 }

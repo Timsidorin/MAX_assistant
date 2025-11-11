@@ -1,6 +1,6 @@
 import { Button, Typography } from "@maxhub/max-ui";
 import { useEffect } from "react";
-import "@styles/ScannerModal.css";
+import "../../assets/styles/ScannerModal.css";
 
 export function ScannerModal({ isOpen, onClose }) {
     useEffect(() => {

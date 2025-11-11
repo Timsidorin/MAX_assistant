@@ -5,7 +5,7 @@ import {NavLink} from "react-router";
 export function BottomToolBar() {
     return (
         <div style={{
-            background: "#edeef2",
+            backgroundColor: "light-dark(#edeef2, #17181c)",
             padding: "10px",
             position: "fixed",
             bottom: "0px",
