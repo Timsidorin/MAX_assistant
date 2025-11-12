@@ -1,9 +1,11 @@
-import {Button, Flex} from "@maxhub/max-ui";
+import {ToolButton, Flex, Typography} from "@maxhub/max-ui";
+import {FiUser, FiPlus} from "react-icons/fi";
+import {NavLink} from "react-router";
 
 export function BottomToolBar() {
     return (
         <div style={{
-            background: "#edeef2",
+            backgroundColor: "light-dark(#edeef2, #17181c)",
             padding: "10px",
             position: "fixed",
             bottom: "0px",
@@ -15,24 +17,47 @@ export function BottomToolBar() {
         }}>
             <Flex
                 direction="row"
-                gap={12}
+                gap={8}
+                style={{ width: '100%' }}
             >
-                <Button
-                    appearance="neutral"
-                    mode="secondary"
-                    size="large"
-                    stretched
+                <NavLink
+                    to='/create'
+                    style={{
+                        textDecoration: 'none',
+                        color: 'inherit',
+                        flex: 1,
+                        display: 'flex'
+                    }}
                 >
-                    Камера
-                </Button>
-                <Button
-                    appearance="neutral"
-                    mode="secondary"
-                    size="large"
-                    stretched
+                    <ToolButton
+                        icon={<FiPlus size={24}/>}
+                        onClick={() => {}}
+                        style={{ width: '100%' }}
+                    >
+                        <Typography.Action>
+                            Создать
+                        </Typography.Action>
+                    </ToolButton>
+                </NavLink>
+                <NavLink
+                    to='/profile'
+                    style={{
+                        textDecoration: 'none',
+                        color: 'inherit',
+                        flex: 1,
+                        display: 'flex'
+                    }}
                 >
-                    Профиль
-                </Button>
+                    <ToolButton
+                        icon={<FiUser size={24}/>}
+                        onClick={() => {}}
+                        style={{ width: '100%' }}
+                    >
+                        <Typography.Action>
+                            Профиль
+                        </Typography.Action>
+                    </ToolButton>
+                </NavLink>
             </Flex>
         </div>
     )

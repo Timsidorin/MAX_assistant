@@ -108,7 +108,6 @@ async function handleSendReport() {
     total_potholes.detections.HIGH += element.detections.HIGH;
     total_potholes.detections.MEDIUM += element.detections.MEDIUM;
     total_potholes.detections.LOW += element.detections.LOW;
-    total_potholes.total_potholes = element.total_potholes;
   });
   let data = {
     user_id: props.dataAnswer.user_id,
@@ -116,6 +115,7 @@ async function handleSendReport() {
     longitude: props.dataAnswer.longitude,
     address: props.dataAnswer.address,
     image_urls: urlList.value,
+    total_potholes: props.dataAnswer.total_potholes,
     ...total_potholes,
   }
   const loading = ElLoading.service({

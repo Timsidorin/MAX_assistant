@@ -1,0 +1,347 @@
+.galleryContainer {
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.galleryItem {
+    position: relative;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    flex: 0 1 calc(25% - 16px);
+    min-width: 200px;
+    max-width: 280px;
+    margin-bottom: 16px; /* Добавляем отступ снизу */
+}
+
+.galleryItem:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.galleryImage {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.galleryItem:hover .galleryImage {
+    transform: scale(1.05);
+}
+
+.imageOverlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+    padding: 20px 12px 12px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.galleryItem:hover .imageOverlay {
+    opacity: 1;
+}
+
+.imageTitle {
+    color: white;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+/* Лайтбокс стили */
+.lightbox {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn 0.3s ease;
+}
+
+.lightboxContent {
+    position: relative;
+    max-width: 90%;
+    max-height: 90%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.lightboxImageContainer {
+    position: relative;
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.lightboxImage {
+    max-width: 100%;
+    max-height: 80vh;
+    object-fit: contain;
+    border-radius: 8px;
+}
+
+.closeButton {
+    position: absolute;
+    top: -40px;
+    right: 0;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 32px;
+    cursor: pointer;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.3s ease;
+    z-index: 1001;
+}
+
+.closeButton:hover {
+    opacity: 0.7;
+}
+
+.navButton {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    font-size: 24px;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    z-index: 1001;
+}
+
+.navButton:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-50%) scale(1.1);
+}
+
+/* Кнопка назад для мобильных устройств */
+.backButton {
+    position: absolute;
+    bottom: -60px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 25px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    display: none; /* По умолчанию скрыта */
+}
+
+.backButton:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.imageInfo {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+    color: white;
+    padding: 20px;
+    text-align: center;
+}
+
+.imageInfo h3 {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+}
+
+.imageInfo p {
+    margin: 0;
+    opacity: 0.9;
+    font-size: 14px;
+}
+
+.imageCounter {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    color: white;
+    font-size: 14px;
+    opacity: 0.8;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .galleryItem {
+        flex: 0 1 calc(50% - 16px);
+        min-width: 150px;
+    }
+
+    .galleryImage {
+        height: 150px;
+    }
+
+    .navButton {
+        width: 40px;
+        height: 40px;
+        font-size: 20px;
+    }
+
+    .lightboxContent {
+        max-width: 95%;
+        max-height: 95%;
+    }
+
+    /* Показываем кнопку назад на мобильных */
+    .backButton {
+        display: block;
+    }
+
+    /* Увеличиваем зону клика для навигации */
+    .navButton {
+        width: 60px;
+        height: 60px;
+        font-size: 24px;
+    }
+}
+
+@media (max-width: 480px) {
+    .galleryItem {
+        flex: 0 1 100%;
+    }
+
+    .galleryContainer {
+        padding: 10px;
+        gap: 12px;
+    }
+
+    .navButton {
+        width: 50px;
+        height: 50px;
+        font-size: 20px;
+    }
+}
+
+.galleryScrollContainer {
+    max-height: 500px;
+    overflow-y: auto;
+    border-radius: 12px;
+    margin: 0 auto;
+    max-width: 1200px;
+    padding-bottom: 80px;
+}
+
+.addImageItem {
+    flex: 0 1 calc(25% - 16px);
+    min-width: 200px;
+    max-width: 280px;
+    height: 200px;
+    border: 2px dashed #e0e0e0;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background-color: light-dark(#f9f9f9, #17181c);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin-bottom: 16px;
+}
+
+.addImageItem:hover {
+    border-color: #007bff;
+    background-color: light-dark(#f0f8ff, #17181c);
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.addImageIcon {
+    font-size: 32px;
+    color: #666;
+    margin-bottom: 12px;
+    transition: color 0.3s ease;
+}
+
+.addImageItem:hover .addImageIcon {
+    color: #007bff;
+}
+
+.addImageText {
+    font-size: 14px;
+    color: #666;
+    font-weight: 500;
+    transition: color 0.3s ease;
+}
+
+.addImageItem:hover .addImageText {
+    color: #007bff;
+}
+
+@media (max-width: 768px) {
+    .addImageItem {
+        flex: 0 1 calc(50% - 16px);
+        min-width: 150px;
+        height: 150px;
+    }
+}
+
+@media (max-width: 480px) {
+    .addImageItem {
+        flex: 0 1 100%;
+        height: 120px;
+    }
+
+    .addImageIcon {
+        font-size: 24px;
+        margin-bottom: 8px;
+    }
+
+    .addImageText {
+        font-size: 12px;
+    }
+}
+
+.deleteButton {
+    position: absolute;
+    left: 50%;
+    bottom: -100px;
+    transform: translateX(-50%);
+    background: rgba(255, 0, 0, 0.7);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
