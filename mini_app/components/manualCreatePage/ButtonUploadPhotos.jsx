@@ -1,12 +1,34 @@
 import styles from '@assets/styles/module/ButtonUploadPhotos.module.css';
-import {useFileDialog} from '@siberiacancode/reactuse';
 import {useEffect} from "react";
+import {useFileDialog} from "@hooks/useFileDialog";
+
+export function ButtonUploadPhotosContainer(props) {
+    const fileDialog = useFileDialog({
+        accept: 'image/*',
+        maxFiles: 10,
+        multiple: true
+    });
+
+    useEffect(() => {
+        if (fileDialog.files) {
+            props.setPhotos(fileDialog.files);
+        }
+        if (fileDialog.error) {
+            console.log(fileDialog.error);
+        }
+    }, [fileDialog.files]);
+
+    return (
+        <>
+            <ButtonUploadPhotosViews onAction={fileDialog.open}/>
+        </>
+    )
+}
 
 function ButtonUploadPhotosViews(props) {
     return (
         <>
             <div onClick={() => props.onAction()} className={styles['input-div']}>
-                <input className={styles['input']}/>
                 <svg xmlns="http://www.w3.org/2000/svg" width="2em" height="1.5em"
                      viewBox="0 0 24 24" fill="none" stroke="currentColor"
                      className={styles['icon']}>
@@ -16,22 +38,6 @@ function ButtonUploadPhotosViews(props) {
                     <polyline points="16 16 12 12 8 16"></polyline>
                 </svg>
             </div>
-        </>
-    )
-}
-
-export function ButtonUploadPhotosContainer(props) {
-    const fileDialog  = useFileDialog();
-    
-useEffect(() => {
-        if (fileDialog.value) {
-           props.setPhotos(fileDialog.value);
-        }
-    }, [fileDialog.value]);
-    
-    return (
-        <>
-            <ButtonUploadPhotosViews onAction={fileDialog.open}/>
         </>
     )
 }

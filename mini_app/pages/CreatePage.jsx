@@ -10,7 +10,7 @@ export function CreatePage() {
     const navigate = useNavigate();
 
     const linkManualCreate = () => {
-        navigate("/manual-create");
+        navigate("/selected-position");
     };
 
     return <>

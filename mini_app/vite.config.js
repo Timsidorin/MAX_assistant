@@ -9,6 +9,7 @@ export default defineConfig({
             '@components' : path.resolve(__dirname, './components'),
             '@assets' : path.resolve(__dirname, './assets'),
             '@api' : path.resolve(__dirname, './api'),
+            '@hooks' : path.resolve(__dirname, './hooks'),
         }
     },
     define: {
