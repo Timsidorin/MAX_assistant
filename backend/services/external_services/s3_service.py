@@ -71,7 +71,7 @@ class S3Service:
                 return file_url
 
             except Exception as e:
-                print(f"❌ Ошибка загрузки в S3: {e}")
+                print(f"Ошибка загрузки в S3: {e}")
                 raise
 
     async def delete_file(self, s3_key: str) -> bool:
@@ -114,9 +114,9 @@ class S3Service:
             try:
                 if not await self.check_bucket_exists():
                     await s3.create_bucket(Bucket=self.bucket_name)
-                    print(f"✅ Bucket {self.bucket_name} создан")
+                    print(f"Bucket {self.bucket_name} создан")
             except Exception as e:
-                print(f"❌ Ошибка создания bucket: {e}")
+                print(f"Ошибка создания bucket: {e}")
 
     async def make_bucket_public(self):
         """
@@ -157,5 +157,5 @@ class S3Service:
                     return [obj['Key'] for obj in response['Contents']]
                 return []
             except Exception as e:
-                print(f"❌ Ошибка получения списка файлов: {e}")
+                print(f"Ошибка получения списка файлов: {e}")
                 return []
