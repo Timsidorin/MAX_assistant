@@ -1,4 +1,3 @@
-# report_schema.py
 from pydantic import BaseModel
 from typing import Optional, List, Dict
 from datetime import datetime
@@ -58,7 +57,7 @@ class ReportDraftCreatedResponse(BaseModel):
     status: str
     priority: str
     can_be_submitted: bool
-    message: str = "Черновик создан"
+    message: str = "Черновик заявки создан"
 
 
 class ReportResponse(BaseModel):
@@ -82,6 +81,12 @@ class ReportResponse(BaseModel):
     description: Optional[str]
     comment: Optional[str]
     created_at: datetime
+    submitted_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    ai_agent_task_id: Optional[str] = None
+    ai_agent_status: Optional[str] = None
+    organization_name: Optional[str] = None
+    external_tracking_id: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -98,6 +103,10 @@ class ReportListItem(BaseModel):
     total_potholes: int
     max_risk: float
     created_at: datetime
+    image_url: Optional[str] = None
+    image_urls: Optional[Dict] = None
+    video_url: Optional[str] = None
+    submitted_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -106,3 +115,13 @@ class ReportListItem(BaseModel):
 class ReportListResponse(BaseModel):
     total: int
     items: List[ReportListItem]
+
+
+class ReportSubmitResponse(BaseModel):
+    """Ответ при отправке заявки"""
+    uuid: uuid.UUID
+    status: str
+    priority: str
+    message: str
+    ai_agent_task_id: Optional[str] = None
+    estimated_processing_time: int = 300

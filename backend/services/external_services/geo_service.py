@@ -10,8 +10,6 @@ class GeocodingService:
     """Сервис для работы с геокодированием через DaData"""
     def __init__(self):
         self.api_key = os.getenv("DADATA_API_KEY")
-        if not self.api_key:
-            print("DADATA_API_KEY не найден в .env")
         self.url = "https://suggestions.dadata.ru/suggestions/api/4_1/rs/geolocate/address"
 
     async def geocode_coordinates(self, latitude: str, longitude: str) -> Optional[str]:
@@ -48,7 +46,7 @@ class GeocodingService:
                 else:
                     return None
         except Exception as e:
-            print(f"❌ Ошибка геокодирования: {e}")
+            print(f"Ошибка геокодирования: {e}")
             return None
 
     async def get_address_or_coordinates(

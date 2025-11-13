@@ -12,16 +12,10 @@ class UserService:
 
     async def register_user(self, user_data: UserCreate) -> UserResponse:
         """Регистрация нового пользователя с проверкой существования"""
-
-        # Проверка существования по username
         if await self.repository.user_exists(user_data.username):
             raise ValueError(f"Username '{user_data.username}' already exists")
-
-        # Проверка существования по max_user_id
         if await self.repository.user_exists_by_max_user_id(user_data.max_user_id):
             raise ValueError(f"Max user ID '{user_data.max_user_id}' already exists")
-
-        # Создание пользователя
         user = await self.repository.create_user(user_data)
 
         if not user:
@@ -44,47 +38,20 @@ class UserService:
 
         if not user:
             return None
-
         return UserResponse.model_validate(user)
 
     async def get_user_by_max_user_id(self, max_user_id: str) -> Optional[UserResponse]:
         """Получение пользователя по max_user_id"""
         user = await self.repository.get_user_by_max_user_id(max_user_id)
-
         if not user:
             return None
 
         return UserResponse.model_validate(user)
 
-    async def update_user(self, user_uuid: UUID, user_data: UserUpdate) -> UserResponse:
-        """Обновление пользователя с проверкой уникальности"""
-
-        # Проверка существования пользователя
-        existing_user = await self.repository.get_user_by_uuid(user_uuid)
-        if not existing_user:
-            raise ValueError(f"User with UUID '{user_uuid}' not found")
-
-        # Если обновляется username, проверяем его уникальность
-        if user_data.username and user_data.username != existing_user.username:
-            if await self.repository.user_exists(user_data.username):
-                raise ValueError(f"Username '{user_data.username}' already exists")
-
-        # Обновление пользователя
-        user = await self.repository.update_user(user_uuid, user_data)
 
         if not user:
             raise Exception("Failed to update user")
-
-        return UserResponse.from_orm(user)
-
-    async def delete_user(self, user_uuid: UUID) -> bool:
-        """Удаление пользователя"""
-        success = await self.repository.delete_user(user_uuid)
-
-        if not success:
-            raise ValueError(f"User with UUID '{user_uuid}' not found")
-
-        return success
+        return UserResponse.model_validate(user)
 
     async def get_all_users(self) -> list[UserResponse]:
         """Получение всех пользователей"""

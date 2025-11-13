@@ -7,7 +7,8 @@ from backend.core.database import get_async_session
 from backend.services.report_service import ReportService
 from backend.schemas.report_schema import (
     ReportCreateDraft, ReportUpdate,
-    ReportDraftCreatedResponse, ReportResponse, ReportListResponse, ReportStatusEnum, ReportPriorityEnum
+    ReportDraftCreatedResponse, ReportResponse, ReportListResponse,
+    ReportSubmitResponse, ReportStatusEnum, ReportPriorityEnum
 )
 
 report_router = APIRouter(prefix="/api/reports", tags=["Заявки"])
@@ -27,9 +28,6 @@ async def create_draft(
     return await service.create_draft(payload)
 
 
-
-
-
 @report_router.post(
     "/submit/{report_uuid}",
     response_model=ReportSubmitResponse,
@@ -43,15 +41,13 @@ async def submit_report(
     """
     Отправить заявку на обработку.
 
-    AI-агент будет:
+    Поисковый агент будет:
     1. Искать подходящий канал взаимодействия (email, форма, API)
     2. Формировать и отправлять заявку
     3. Отслеживать статус
     """
     service = ReportService(db)
     return await service.submit_report(report_uuid, background_tasks)
-
-
 
 
 @report_router.get(
@@ -118,3 +114,4 @@ async def delete_draft(
     """Удаление черновика заявки"""
     service = ReportService(db)
     return await service.delete_draft(report_uuid)
+

@@ -5,7 +5,7 @@
 from fastapi import FastAPI, APIRouter
 
 from backend.models.users_model import User
-from backend.models.report_model import Report, ReportStatus, ReportPriority
+from backend.models.report_model import ReportStatus, ReportPriority
 
 
 from backend.routers.cv_router import cv_router
