@@ -40,6 +40,8 @@
 
 ## ⚡ Быстрый старт
 
+Для работы необходимо скачать модель для распознавания дорожных ям и поместить ее в папку проекта cv_models [https://drive.google.com/drive/folders/1-RHs2EtgeanoSNlOj6ZZBN2zhUpsnsob](https://disk.yandex.ru/d/BQkOm1xGN9l6hQ)
+
 ### Предварительные требования
 - Docker и Docker Compose
 - Доступ к API сервисам (GigaChat, MailRu, S3 VK)
