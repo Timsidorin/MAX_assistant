@@ -51,7 +51,6 @@ const capturePhoto = () => {
   if (!videoElement.value || !mediaStream.value) {
     throw new Error('Камера не активна');
   }
-  window.location.href = `https://max.ru/t86_hakaton_bot?startapp=${'3fa85f64-5717-4562-b3fc-2c963f66afa6'}`;
   const video = videoElement.value;
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d');
