@@ -125,7 +125,7 @@ async function handleSendReport() {
   });
   try {
     let response = await sendReport(data);
-    window.location.href = `https://max.ru/t86_hakaton_bot?startapp&draftUUID=${response.data.uuid}`;
+    window.location.href = `https://max.ru/t86_hakaton_bot?startapp=${response.data.uuid}`;
   } catch (e) {
     console.error(e);
   } finally {
