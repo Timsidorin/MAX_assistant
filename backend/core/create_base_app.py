@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 
 from starlette.responses import HTMLResponse, JSONResponse
 
-
+import os
 
 
 
@@ -17,6 +17,12 @@ from starlette.responses import HTMLResponse, JSONResponse
 def create_base_app(configs):
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[dict, None]:
+        model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'cv_models', 'best.pt'))
+        if os.path.isfile(model_path):
+            logger.info("Модель найдена")
+        else:
+            logger.error("Модель не найдена, скачайте с облака: https://disk.yandex.ru/d/BQkOm1xGN9l6hQ")
+
         """Управление жизненным циклом приложения."""
         logger.info("Инициализация приложения...")
         yield

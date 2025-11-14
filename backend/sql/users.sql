@@ -12,3 +12,5 @@ CREATE INDEX idx_max_user_id ON users(max_user_id);
 CREATE INDEX idx_first_name ON users(first_name);
 CREATE INDEX idx_last_name ON users(last_name);
 CREATE INDEX idx_username ON users(username);
+
+

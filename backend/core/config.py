@@ -26,7 +26,7 @@ class Configs(BaseSettings):
     # ------------ БД ------------
     DB_HOST: Optional[str] = Field(default="localhost", env="DB_HOST")
     DB_PORT: Optional[int] = Field(default=5432, env="DB_PORT")
-    DB_USER: Optional[str] = Field(default="postgres", env="DB_USER")
+    DB_USER: Optional[str] = Field(default="admin", env="DB_USER")
     DB_NAME: Optional[str] = Field(default="MAX", env="DB_NAME")
     DB_PASS: Optional[str] = Field(default="admin", env="DB_PASS")
 
@@ -69,3 +69,4 @@ def get_db_url():
 
 def get_auth_data():
     return {"secret_key": configs.SECRET_KEY, "algorithm": configs.ALGORITHM}
+
