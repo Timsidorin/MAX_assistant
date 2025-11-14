@@ -153,7 +153,7 @@ async def detect_video(
             )
 
         if not payload.filename:
-            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             unique_id = str(uuid.uuid4())[:8]
             filename = f"pothole_video_{timestamp}_{unique_id}.mp4"
         else:
