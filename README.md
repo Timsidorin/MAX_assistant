@@ -65,28 +65,28 @@ cd MAX_assistant
 
 Создайте файл `.env` в корне проекта (по аналогии с `.env.example`) и укажите все ключи:
 
-Bot
+#Bot
 TOKEN_BOT=your_telegram_bot_token_here
 WEBAPP_URL=your_webapp_url_here
 
-Dadata API
+#Dadata API
 DADATA_API_KEY=your_dadata_api_key_here
 
-GigaChat API
+#GigaChat API
 GIGACHAT_CREDENTIALS=your_gigachat_authorization_key_here
 
-Mail.ru SMTP
+#Mail.ru SMTP
 MAILRU_SMTP_USER=your_mailru_smtp_user_here
 MAILRU_SMTP_PASSWORD=your_mailru_smtp_password_here
 
-База данных
+#База данных
 DB_USER=your_database_user_here
 DB_NAME=your_database_name_here
 DB_PASS=your_database_password_here
 DB_HOST=db_or_localhost_here
 DB_PORT=5432
 
-S3 хранилище VK Cloud
+#S3 хранилище VK Cloud
 AWS_ACCESS_KEY_ID=your_aws_access_key_here
 AWS_SECRET_ACCESS_KEY=your_aws_secret_key_here
 S3_BUCKET_NAME=your_s3_bucket_name_here
