@@ -14,6 +14,7 @@ from backend.core.config import get_db_url
 # Импортируем модели, чтобы они были зарегистрированы в метадате
 from backend.models.users_model import User
 from backend.models.report_model import Report
+from backend.models.tasks_model import Task
 # При необходимости импортируйте другие модели в том же стиле
 
 config = context.config

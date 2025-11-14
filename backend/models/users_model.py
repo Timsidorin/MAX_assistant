@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID, uuid4
 from sqlalchemy import String, DateTime, Integer, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 import sqlalchemy as sa
 from backend.core.database import Base
 
@@ -25,3 +25,4 @@ class User(Base):
     user_level: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     current_status: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     total_points: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    tasks = relationship("Task", back_populates="user")
