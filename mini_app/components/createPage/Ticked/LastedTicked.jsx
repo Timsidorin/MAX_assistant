@@ -1,16 +1,18 @@
-import {Typography} from "@maxhub/max-ui";
+import {Typography, Flex} from "@maxhub/max-ui";
 import {TickedCardContainer} from "@components/createPage/Ticked/TickedCard.jsx";
 
 function LastedTickedView(props) {
     return (
         <>
-            <Typography.Title>
-                Последние заявки
-            </Typography.Title>
+            <Flex justify='center'>
+                <Typography.Title>
+                    Последние заявки
+                </Typography.Title>
+            </Flex>
             <div style={{
                 marginTop: "10px",
                 display: "flex",
-                flexDirection: "row",
+                flexDirection: "column",
                 flexWrap: "wrap",
                 gap: "10px"
             }}

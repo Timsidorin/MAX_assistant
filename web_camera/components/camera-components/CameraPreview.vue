@@ -63,7 +63,7 @@ const capturePhoto = () => {
 
 const startVideo = async () => {
   const stream = await navigator.mediaDevices.getUserMedia({
-
+    //когда-нибудь потом
   })
 }
 onMounted(() => {
