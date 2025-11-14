@@ -11,13 +11,11 @@ import json
 import random
 from typing import Optional, Dict
 from dotenv import load_dotenv
-import undetected_chromedriver as uc  # Замена обычного selenium
+import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, WebDriverException
-
-from backend.depends import get_service
 
 load_dotenv()
 
@@ -243,10 +241,14 @@ class AIAgentService:
                 "status": "email_not_found"
             }
 
+_service_instance = None
+
 def find_road_agency_contacts(address: str, coordinates: Optional[dict] = None) -> dict:
     """Публичная функция для использования в других модулях."""
-    service = get_service()
-    return service.find_road_agency_contacts(address, coordinates)
+    global _service_instance
+    if _service_instance is None:
+        _service_instance = AIAgentService()
+    return _service_instance.find_road_agency_contacts(address, coordinates)
 
 # Тестирование
 if __name__ == "__main__":

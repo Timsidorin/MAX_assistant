@@ -11,6 +11,7 @@ from backend.services.users_service import UserService
 _email_service = None
 _document_service = None
 _gigachat_service = None
+_service = None
 
 async def get_user_service() -> UserService:
     """Получение сервиса пользователя с сессией"""
@@ -40,7 +41,6 @@ def get_gigachat_service() -> GigaChatService:
 
 
 def get_service():
-    """Singleton для AIAgentService."""
     global _service
     if _service is None:
         _service = AIAgentService()

@@ -1,5 +1,5 @@
 # backend/schemas/users_schema.py
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 from uuid import UUID
 from typing import Optional
@@ -18,6 +18,12 @@ class UserUpdate(BaseModel):
     first_name: Optional[str] = Field(None, max_length=50)
     last_name: Optional[str] = Field(None, max_length=50)
     username: Optional[str] = Field(None, max_length=50)
+    user_level: Optional[int] = Field(None, ge=1, le=6)
+    current_status: Optional[str] = Field(None)  # Строка, не dict
+    total_points: Optional[int] = Field(None, ge=0)
+    sent_reports_count: Optional[int] = Field(None, ge=0)
+
+    model_config = ConfigDict(from_attributes=True, extra='ignore')
 
 
 class UserResponse(BaseModel):
@@ -28,6 +34,9 @@ class UserResponse(BaseModel):
     last_name: str
     username: str
     registration_at: datetime
+    sent_reports_count: int = Field(default=0, ge=0)
+    user_level: int = Field(default=1, ge=1, le=6)
+    current_status: Optional[str] = Field(default=None)
+    total_points: int = Field(default=0, ge=0)
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

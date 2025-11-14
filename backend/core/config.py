@@ -1,6 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
-from typing import Optional
+from typing import Optional, ClassVar, Dict, Any
 import os
 
 
@@ -8,6 +8,16 @@ class Configs(BaseSettings):
     """Главный конфиг проекта"""
     # ------------ Настройки проекта ------------
     PROJECT_NAME: str = "Ассистент по дорожным обращениям"
+
+    # ------------ Пользовательсвие уровни ------------
+    USER_LEVELS: ClassVar[Dict[int, Dict[str, Any]]] = {
+        1: {"name": "👶 Начинающий ямоборец", "points": 0},
+        2: {"name": "🚶  ямоборец-активист", "points": 100},
+        3: {"name": "🚗 Водитель-жалобщик", "points": 300},
+        4: {"name": "🔍 Инспектор дорог", "points": 600},
+        5: {"name": "🏆 Мастер ямоборения", "points": 1000},
+        6: {"name": "🌟 Легенда городских дорог", "points": 2000}
+    }
 
     # ------------ Веб-сервер ------------
     HOST: str = "localhost"
@@ -54,6 +64,8 @@ class Configs(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")
     )
+
+
 
 
 configs = Configs()

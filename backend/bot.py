@@ -27,11 +27,10 @@ load_dotenv(dotenv_path="../.env", verbose=True)
 logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.getenv("TOKEN_BOT")
+WEBAPP_URL = os.getenv("WEBAPP_URL")
 
 bot = Bot(TOKEN)
 dp = Dispatcher()
-
-WEBAPP_URL = "https://orderly-familiar-bushbuck.cloudpub.ru/"
 
 
 class InstructionPayload(CallbackPayload, prefix='instruction'):

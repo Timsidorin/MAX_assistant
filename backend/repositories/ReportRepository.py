@@ -46,7 +46,6 @@ class ReportRepository:
         Получить список отчетов с фильтрацией и пагинацией.
         Возвращает (список отчетов, общее количество).
         """
-        # Базовый запрос для списка
         stmt = select(Report)
         where_conditions = []
         if user_id is not None:
@@ -72,3 +71,13 @@ class ReportRepository:
         total = count_result.scalar() or 0
 
         return reports, total
+
+
+    async def count_submitted_reports_by_user(self, userid: int) -> int:
+        stmt = select(func.count(Report.uuid)).where(
+            Report.userid == userid,
+            Report.status.in_(
+                [ReportStatus.SUBMITTED, ReportStatus.INREVIEW, ReportStatus.INPROGRESS, ReportStatus.COMPLETED])
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar() or 0

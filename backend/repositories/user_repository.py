@@ -90,26 +90,35 @@ class UserRepository:
             await self.session.rollback()
             raise e
 
-    async def update_user(self, user_uuid: UUID, user_data: UserUpdate) -> Optional[User]:
-        """Обновление данных пользователя"""
+    async def update_user(self, user_uuid: UUID, update_data: dict) -> Optional[User]:
+        """
+        Обновление данных пользователя
+        """
         try:
             user = await self.get_user_by_uuid(user_uuid)
             if not user:
                 return None
-
-            if user_data.first_name:
-                user.first_name = user_data.first_name
-            if user_data.last_name:
-                user.last_name = user_data.last_name
-            if user_data.username:
-                user.username = user_data.username
-
+            for field, value in update_data.items():
+                if hasattr(user, field) and value is not None:
+                    setattr(user, field, value)
+            self.session.add(user)
             await self.session.commit()
             await self.session.refresh(user)
             return user
+
         except IntegrityError:
             await self.session.rollback()
             return None
+        except Exception as e:
+            await self.session.rollback()
+            raise e
+
+    async def update(self, user: User) -> User:
+        try:
+            self.session.add(user)
+            await self.session.commit()
+            await self.session.refresh(user)
+            return user
         except Exception as e:
             await self.session.rollback()
             raise e
@@ -133,7 +142,7 @@ class UserRepository:
         try:
             query = select(User)
             result = await self.session.execute(query)
-            return result.scalars().all()
+            return list(result.scalars().all())
         except Exception as e:
             await self.session.rollback()
             raise e

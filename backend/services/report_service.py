@@ -1,23 +1,27 @@
-# services/report_service.py
 from pathlib import Path
 from urllib.parse import urlparse
-
-import requests
+import aiohttp
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, BackgroundTasks
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 import uuid
+import logging
 
+from backend.core.config import configs
 from backend.depends import get_email_service, get_document_service, get_gigachat_service
 from backend.models.report_model import ReportStatus, ReportPriority, Report
 from backend.schemas.report_schema import (
     ReportCreateDraft, ReportUpdate,
     ReportDraftCreatedResponse, ReportResponse, ReportSubmitResponse,
-    ReportListResponse, ReportListItem, SeverityStats
+    ReportListResponse, ReportListItem
 )
 from backend.repositories.ReportRepository import ReportRepository
 from backend.services.ai_agent_service import find_road_agency_contacts
+from backend.services.users_service import UserService
+from backend.schemas.users_schema import UserUpdate
+
+logger = logging.getLogger(__name__)
 
 
 class ReportService:
@@ -61,6 +65,7 @@ class ReportService:
             (report.image_url or report.image_urls or report.video_url)
         )
 
+        logger.info(f"Draft report created: {report.uuid}, can_submit={can_submit}")
         return ReportDraftCreatedResponse(
             uuid=report.uuid,
             status=report.status.value,
@@ -74,6 +79,7 @@ class ReportService:
         report = await self.repository.get_by_uuid(report_uuid)
 
         if not report:
+            logger.warning(f"Report {report_uuid} not found")
             raise HTTPException(status_code=404, detail="Заявка не найдена")
 
         return ReportResponse(
@@ -114,9 +120,11 @@ class ReportService:
         report = await self.repository.get_by_uuid(report_uuid)
 
         if not report:
+            logger.warning(f"Report {report_uuid} not found for update")
             raise HTTPException(status_code=404, detail="Заявка не найдена")
 
         if report.status != ReportStatus.DRAFT:
+            logger.warning(f"Cannot edit report {report_uuid} with status {report.status.value}")
             raise HTTPException(
                 status_code=400,
                 detail=f"Нельзя редактировать заявку со статусом {report.status.value}"
@@ -133,6 +141,7 @@ class ReportService:
         report.priority = report.auto_priority
         report = await self.repository.update(report)
 
+        logger.info(f"Report {report_uuid} updated successfully")
         return await self.get_by_uuid(report_uuid)
 
     async def submit_report(self, report_uuid: uuid.UUID, background_tasks: BackgroundTasks) -> ReportSubmitResponse:
@@ -140,9 +149,11 @@ class ReportService:
         report = await self.repository.get_by_uuid(report_uuid)
 
         if not report:
+            logger.warning(f"Report {report_uuid} not found for submission")
             raise HTTPException(status_code=404, detail="Заявка не найдена")
 
         if report.status != ReportStatus.DRAFT:
+            logger.warning(f"Report {report_uuid} already submitted with status {report.status.value}")
             raise HTTPException(
                 status_code=400,
                 detail=f"Заявка уже отправлена. Текущий статус: {report.status.value}"
@@ -150,23 +161,42 @@ class ReportService:
 
         can_submit = report.can_be_submitted
         if not can_submit:
+            logger.warning(f"Report {report_uuid} not ready for submission")
             raise HTTPException(
                 status_code=400,
                 detail="Заявка не готова к отправке. Заполните все обязательные поля."
             )
 
-        # Обновляем статус
         report.status = ReportStatus.SUBMITTED
         report.submitted_at = datetime.now()
 
-        # Создаем задачу для агента
+        if report.user_id:
+            try:
+                user_service = UserService(self.db)
+                points_awarded = {
+                    ReportPriority.LOW: 10,
+                    ReportPriority.MEDIUM: 20,
+                    ReportPriority.HIGH: 50,
+                    ReportPriority.CRITICAL: 100
+                }.get(report.priority, 10)
+
+                updated_user = await user_service.update_user_points(report.user_id, points_awarded)
+                if updated_user:
+                    logger.info(f"User {report.user_id} awarded {points_awarded} points for report {report_uuid}")
+                else:
+                    logger.warning(f"Failed to update points for user {report.user_id}")
+
+            except Exception as e:
+                logger.error(f"Error updating user {report.user_id} points: {e}", exc_info=True)
+
         task_id = str(uuid.uuid4())
         report.ai_agent_task_id = task_id
         report.ai_agent_status = "processing"
 
         report = await self.repository.update(report)
 
-        # Запускаем фоновую задачу
+        logger.info(f"Report {report_uuid} submitted, task_id={task_id}")
+
         background_tasks.add_task(
             self._process_and_send_complaint,
             report_uuid=report.uuid,
@@ -185,71 +215,88 @@ class ReportService:
     async def _process_and_send_complaint(self, report_uuid: uuid.UUID, task_id: str):
         """Фоновая обработка: поиск контактов, генерация, отправка с фото."""
         try:
+            logger.info(f"[Task {task_id}] Starting background processing for report {report_uuid}")
+
             report = await self.repository.get_by_uuid(report_uuid)
-            # 1. Поиск контактов
-            print(f"[Report Service] Step 1: Finding contacts...")
+            if not report:
+                logger.error(f"[Task {task_id}] Report {report_uuid} not found")
+                return
+
+            # Step 1: Find contacts
+            logger.info(f"[Task {task_id}] Finding contacts for address: {report.address}")
             contacts_result = find_road_agency_contacts(report.address)
 
             if not contacts_result.get('success') or not contacts_result.get('email'):
                 report.ai_agent_status = "failed"
                 report.comment = "Не удалось найти email для обращения"
                 await self.repository.update(report)
+                logger.error(f"[Task {task_id}] Failed to find contacts")
                 return
 
             organization_name = contacts_result.get('organization', 'Управление дорожной деятельности')
-            # email_to = contacts_result['email']
-            email_to = "timofeisidorin@vk.com"
+            email_to = "timofeisidorin@vk.com"  # For testing
+            # email_to = contacts_result.get('email')  # Production
 
             report.organization_name = organization_name
             await self.repository.update(report)
+            logger.info(f"[Task {task_id}] Found email: {email_to}, organization: {organization_name}")
 
-            print(f"[Report Service] Found email: {email_to}")
+            # Step 2: Get user name
+            person_name = "Заявитель"
+            if report.user_id:
+                try:
+                    user_service = UserService(self.db)
+                    user = await user_service.get_user_by_max_user_id(report.user_id)
 
-            # 2. Генерация текста через GigaChat
-            print(f"[Report Service] Step 2: Generating complaint text...")
+                    if user and user.first_name and user.last_name:
+                        person_name = f"{user.first_name} {user.last_name}"
+                        logger.debug(f"[Task {task_id}] User name: {person_name}")
+                except Exception as e:
+                    logger.error(f"[Task {task_id}] Error getting user data: {e}", exc_info=True)
+
+            # Step 3: Generate complaint text
+            logger.info(f"[Task {task_id}] Generating complaint text")
             gigachat = get_gigachat_service()
-
             complaint_text = gigachat.generate_complaint_text(
                 city=contacts_result.get('city', 'Неизвестно'),
                 address=report.address,
                 description=report.description or "Обнаружены дефекты дорожного покрытия",
                 total_potholes=report.total_potholes,
                 max_risk=report.max_risk,
-                priority=report.priority.value
+                priority=report.priority.value,
+                person_name=person_name
             )
 
-            # 3. Создание PDF документа
-            print(f"[Report Service] Step 3: Creating document and converting to PDF...")
+            # Step 4: Create document
+            logger.info(f"[Task {task_id}] Creating complaint document")
             doc_service = get_document_service()
-
             street = self._extract_street(report.address)
-
             file_bytes, file_ext = doc_service.create_complaint_document(
-                city=contacts_result.get('city', 'Неизвестно'),
+                city=contacts_result.get("city", ""),
                 street=street,
                 organization_name=organization_name,
-                person_name="Гражданин",
+                person_name=person_name,
                 count_photos=self._count_photos(report),
                 year=datetime.now().year,
                 convert_to_pdf=True
             )
 
-            filename = f"zayavlenie_{report.uuid}.{file_ext}"
+            if len(file_bytes) == 0:
+                raise ValueError("Generated document is empty")
 
-            # 4. Скачивание фотографий
-            print(f"[Report Service] Step 4: Downloading photos...")
+            logger.info(f"[Task {task_id}] Document created: {len(file_bytes)} bytes")
+
+            # Step 5: Download photos
+            logger.info(f"[Task {task_id}] Downloading photos")
             photo_attachments = await self._download_photos(report)
 
-            # 5. Формируем все вложения
-            attachments = [
-                (filename, file_bytes)  # PDF/DOCX заявление
-            ]
-            attachments.extend(photo_attachments)  # Добавляем фото
+            attachments = [(f"zayavlenie.{file_ext}", file_bytes)]
+            attachments.extend(photo_attachments)
 
-            print(f"[Report Service] Total attachments: {len(attachments)}")
+            logger.info(f"[Task {task_id}] Total attachments: {len(attachments)}")
 
-            # 6. Отправка email
-            print(f"[Report Service] Step 5: Sending email...")
+            # Step 6: Send email
+            logger.info(f"[Task {task_id}] Sending email to {email_to}")
             email_service = get_email_service()
 
             subject = f"Заявление о дефектах дорожного покрытия - {report.address}"
@@ -265,70 +312,62 @@ class ReportService:
                 report.ai_agent_status = "completed"
                 report.status = ReportStatus.IN_REVIEW
                 report.comment = f"Заявление отправлено на {email_to} с {len(photo_attachments)} фото"
-                print(f"[Report Service] ✅ Successfully sent to {email_to}")
+                logger.info(f"[Task {task_id}] Successfully sent to {email_to}")
             else:
                 report.ai_agent_status = "failed"
                 report.comment = "Ошибка при отправке email"
-                print(f"[Report Service] ❌ Failed to send email")
+                logger.error(f"[Task {task_id}] Failed to send email")
 
             await self.repository.update(report)
 
         except Exception as e:
-            print(f"[Report Service] ❌ Error: {e}")
+            logger.error(f"[Task {task_id}] Error processing report {report_uuid}: {e}", exc_info=True)
             try:
                 report = await self.repository.get_by_uuid(report_uuid)
                 if report:
                     report.ai_agent_status = "failed"
                     report.comment = f"Ошибка: {str(e)}"
                     await self.repository.update(report)
-            except:
-                pass
+            except Exception as update_error:
+                logger.error(f"[Task {task_id}] Failed to update report status: {update_error}", exc_info=True)
 
-    async def _download_photos(self, report: Report) -> list:
-        """
-        Скачивает все фотографии из report.image_urls.
-
-        Returns:
-            list: [(filename, file_bytes), ...]
-        """
+    async def _download_photos(self, report: Report) -> List[tuple]:
+        """Скачивает все фотографии из report.image_urls."""
         photo_attachments = []
-
-        # Собираем все URL фотографий
         photo_urls = []
 
         if report.image_url:
             photo_urls.append(report.image_url)
 
         if report.image_urls and isinstance(report.image_urls, dict):
-            # image_urls может быть: {"urls": ["url1", "url2", ...]}
             if 'urls' in report.image_urls:
                 photo_urls.extend(report.image_urls['urls'])
-            # Или просто список: ["url1", "url2", ...]
             elif isinstance(report.image_urls, list):
                 photo_urls.extend(report.image_urls)
 
-        print(f"[Report Service] Found {len(photo_urls)} photo URLs")
-        for idx, url in enumerate(photo_urls, 1):
-            try:
-                print(f"[Report Service] Downloading photo {idx}/{len(photo_urls)}: {url[:50]}...")
+        logger.info(f"Found {len(photo_urls)} photo URLs to download")
 
-                response = requests.get(url, timeout=30)
-                response.raise_for_status()
+        async with aiohttp.ClientSession() as session:
+            for idx, url in enumerate(photo_urls, 1):
+                try:
+                    logger.debug(f"Downloading photo {idx}/{len(photo_urls)}: {url[:50]}...")
 
-                # Определяем расширение файла
-                parsed_url = urlparse(url)
-                file_ext = Path(parsed_url.path).suffix or '.jpg'
+                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response:
+                        response.raise_for_status()
+                        content = await response.read()
 
-                # Формируем имя файла
-                filename = f"photo_{idx}{file_ext}"
+                        parsed_url = urlparse(url)
+                        file_ext = Path(parsed_url.path).suffix or '.jpg'
+                        filename = f"photo_{idx}{file_ext}"
 
-                photo_attachments.append((filename, response.content))
-                print(f"[Report Service] Downloaded: {filename} ({len(response.content)} bytes)")
+                        photo_attachments.append((filename, content))
+                        logger.debug(f"Downloaded: {filename} ({len(content)} bytes)")
 
-            except Exception as e:
-                print(f"[Report Service] ⚠️ Failed to download photo {idx}: {e}")
-                continue
+                except Exception as e:
+                    logger.warning(f"Failed to download photo {idx} from {url[:50]}: {e}")
+                    continue
 
+        logger.info(f"Successfully downloaded {len(photo_attachments)}/{len(photo_urls)} photos")
         return photo_attachments
 
     def _count_photos(self, report: Report) -> int:
@@ -357,8 +396,6 @@ class ReportService:
                 street_parts.append(part)
 
         return ', '.join(street_parts) if street_parts else address
-
-
 
     async def get_list(
             self,
@@ -396,6 +433,7 @@ class ReportService:
             for r in reports
         ]
 
+        logger.debug(f"Retrieved {len(items)}/{total} reports")
         return ReportListResponse(total=total, items=items)
 
     async def delete_draft(self, report_uuid: uuid.UUID) -> dict:
@@ -403,15 +441,18 @@ class ReportService:
         report = await self.repository.get_by_uuid(report_uuid)
 
         if not report:
+            logger.warning(f"Report {report_uuid} not found for deletion")
             raise HTTPException(status_code=404, detail="Заявка не найдена")
 
         if report.status != ReportStatus.DRAFT:
+            logger.warning(f"Cannot delete non-draft report {report_uuid} with status {report.status.value}")
             raise HTTPException(
                 status_code=400,
                 detail="Можно удалять только черновики"
             )
 
         await self.repository.delete(report)
+        logger.info(f"Draft report {report_uuid} deleted")
 
         return {
             "message": "Черновик удален",
@@ -464,4 +505,5 @@ class ReportService:
         if total > 0:
             stats["average_risk"] = round(risk_sum / total, 2)
 
+        logger.debug(f"User {user_id} stats: {total} reports")
         return stats
