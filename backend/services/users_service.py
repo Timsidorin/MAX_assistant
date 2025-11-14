@@ -127,7 +127,6 @@ class UserService:
         if hasattr(user, 'total_points'):
             user.total_points = total_points
             await self.repository.update(user)
-            await self.session.commit()
 
         result = {
             "level": level,
@@ -160,7 +159,6 @@ class UserService:
                 logger.error(f"Failed to update user {user_uuid}")
                 return None
 
-            await self.session.commit()
             logger.info(f"User {user_uuid} updated successfully with: {update_dict}")
             return UserResponse.model_validate(updated_user)
 
@@ -198,7 +196,6 @@ class UserService:
             user.current_status = USER_LEVELS[new_level]['name']
 
             self.session.add(user)
-            await self.session.commit()
             await self.session.refresh(user)
 
             logger.info(

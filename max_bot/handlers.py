@@ -2,10 +2,13 @@ import logging
 from typing import Optional
 from maxapi.types import MessageCreated, MessageCallback, Attachment
 
-from backend.depends import get_user_service
+from backend.core.database import async_session_maker
+from backend.services.users_service import UserService
 from backend.schemas.users_schema import UserCreate
 from max_bot.keyboards import get_main_keyboard, InstructionPayload
 from max_bot.instruction import instruction_text
+
+logger = logging.getLogger(__name__)
 
 
 async def register_or_get_user(
@@ -14,29 +17,33 @@ async def register_or_get_user(
         last_name: Optional[str] = None
 ) -> bool:
     """Регистрация или получение существующего пользователя"""
-    service = await get_user_service()
+    async with async_session_maker() as session:
+        try:
+            service = UserService(session)
+            existing_user = await service.get_user_by_max_user_id(max_user_id)
 
-    try:
-        existing_user = await service.get_user_by_max_user_id(max_user_id)
+            if existing_user:
+                logger.info(f"User {max_user_id} already exists")
+                return False
 
-        if existing_user:
-            logging.info(f"User {max_user_id} already exists")
+            username = f"user_{max_user_id}"
+            user_data = UserCreate(
+                max_user_id=max_user_id,
+                first_name=first_name,
+                last_name=last_name or "Unknown",
+                username=username
+            )
+
+            await service.register_user(user_data)
+            await session.commit()
+            logger.info(f"User {max_user_id} ({first_name}) registered successfully")
+            return True
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"Error registering user: {e}", exc_info=True)
             return False
-
-        username = f"user_{max_user_id}"
-        user_data = UserCreate(
-            max_user_id=max_user_id,
-            first_name=first_name,
-            last_name=last_name or "Unknown",
-            username=username
-        )
-
-        await service.register_user(user_data)
-        logging.info(f"User {max_user_id} ({first_name}) registered successfully")
-        return True
-    except Exception as e:
-        logging.error(f"Error registering user: {e}")
-        return False
+        finally:
+            await session.close()
 
 
 async def start_handler(event: MessageCreated, bot):
@@ -76,5 +83,4 @@ async def start_handler(event: MessageCreated, bot):
 
 async def instruction_callback_handler(event: MessageCallback, payload: InstructionPayload):
     """Обработчик callback для показа инструкции"""
-    instruction = instruction_text
-    await event.message.answer(instruction)
+    await event.message.answer(instruction_text)

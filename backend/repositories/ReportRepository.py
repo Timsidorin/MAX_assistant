@@ -5,7 +5,6 @@ import uuid as uuid_lib
 
 from backend.models.report_model import Report, ReportStatus, ReportPriority
 
-
 class ReportRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -13,7 +12,7 @@ class ReportRepository:
     async def create(self, report: Report) -> Report:
         """Создать новый отчет"""
         self.db.add(report)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(report)
         return report
 
@@ -25,22 +24,22 @@ class ReportRepository:
 
     async def update(self, report: Report) -> Report:
         """Обновить существующий отчет"""
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(report)
         return report
 
     async def delete(self, report: Report) -> None:
         """Удалить отчет"""
         await self.db.delete(report)
-        await self.db.commit()
+        await self.db.flush()
 
     async def get_list(
-            self,
-            user_id: Optional[int] = None,
-            status: Optional[ReportStatus] = None,
-            priority: Optional[ReportPriority] = None,
-            skip: int = 0,
-            limit: Optional[int] = 50
+        self,
+        user_id: Optional[int] = None,
+        status: Optional[ReportStatus] = None,
+        priority: Optional[ReportPriority] = None,
+        skip: int = 0,
+        limit: Optional[int] = 50
     ) -> Tuple[List[Report], int]:
         """
         Получить список отчетов с фильтрацией и пагинацией.
@@ -48,6 +47,7 @@ class ReportRepository:
         """
         stmt = select(Report)
         where_conditions = []
+
         if user_id is not None:
             where_conditions.append(Report.user_id == user_id)
         if status is not None:
@@ -57,6 +57,7 @@ class ReportRepository:
 
         if where_conditions:
             stmt = stmt.where(*where_conditions)
+
         stmt = stmt.order_by(Report.created_at.desc())
         if limit is not None:
             stmt = stmt.offset(skip).limit(limit)
@@ -67,17 +68,17 @@ class ReportRepository:
         count_stmt = select(func.count(Report.uuid))
         if where_conditions:
             count_stmt = count_stmt.where(*where_conditions)
+
         count_result = await self.db.execute(count_stmt)
         total = count_result.scalar() or 0
 
         return reports, total
 
-
     async def count_submitted_reports_by_user(self, userid: int) -> int:
         stmt = select(func.count(Report.uuid)).where(
             Report.userid == userid,
             Report.status.in_(
-                [ReportStatus.SUBMITTED, ReportStatus.INREVIEW, ReportStatus.INPROGRESS, ReportStatus.COMPLETED])
+                [ReportStatus.SUBMITTED, ReportStatus.IN_REVIEW, ReportStatus.IN_PROGRESS, ReportStatus.COMPLETED])
         )
         result = await self.db.execute(stmt)
         return result.scalar() or 0
