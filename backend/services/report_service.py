@@ -131,12 +131,6 @@ class ReportService:
             description=report.description,
             comment=report.comment,
             created_at=report.created_at,
-            submitted_at=report.submitted_at,
-            updated_at=report.updated_at,
-            ai_agent_task_id=report.ai_agent_task_id,
-            ai_agent_status=report.ai_agent_status,
-            organization_name=report.organization_name,
-            external_tracking_id=report.external_tracking_id
         )
 
     async def update_draft(
@@ -218,7 +212,6 @@ class ReportService:
         report = await self.repository.update(report)
         logger.info(f"Report {report_uuid} submitted, task_id={task_id}")
 
-        # Запускаем фоновую задачу БЕЗ передачи self.db
         background_tasks.add_task(
             self._process_and_send_complaint_wrapper,
             report_uuid=report.uuid,

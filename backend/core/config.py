@@ -66,5 +66,3 @@ def get_db_url():
         f"{configs.DB_HOST}:{configs.DB_PORT}/{configs.DB_NAME}"
     )
 
-
-print(get_db_url())

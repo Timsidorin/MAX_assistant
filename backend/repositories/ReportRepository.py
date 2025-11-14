@@ -24,14 +24,16 @@ class ReportRepository:
 
     async def update(self, report: Report) -> Report:
         """Обновить существующий отчет"""
-        await self.db.flush()
+        self.db.add(report)
+        await self.db.commit()
         await self.db.refresh(report)
         return report
 
     async def delete(self, report: Report) -> None:
         """Удалить отчет"""
         await self.db.delete(report)
-        await self.db.flush()
+        await self.db.commit()  # <-- ИЗМЕНЕНО с flush на commit
+
 
     async def get_list(
         self,
@@ -74,11 +76,16 @@ class ReportRepository:
 
         return reports, total
 
-    async def count_submitted_reports_by_user(self, userid: int) -> int:
+    async def count_submitted_reports_by_user(self, user_id: int) -> int:
+        """Подсчет отправленных заявок пользователя"""
         stmt = select(func.count(Report.uuid)).where(
-            Report.userid == userid,
-            Report.status.in_(
-                [ReportStatus.SUBMITTED, ReportStatus.IN_REVIEW, ReportStatus.IN_PROGRESS, ReportStatus.COMPLETED])
+            Report.user_id == user_id,
+            Report.status.in_([
+                ReportStatus.SUBMITTED,
+                ReportStatus.IN_REVIEW,
+                ReportStatus.IN_PROGRESS,
+                ReportStatus.COMPLETED
+            ])
         )
         result = await self.db.execute(stmt)
         return result.scalar() or 0

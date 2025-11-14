@@ -6,8 +6,8 @@ import uuid
 from backend.core.database import get_async_session
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from repositories.tasks_repository import TaskRepository
-from schemas.tasks_schema import TaskResponse, TaskCreate, TaskUpdate, TaskListResponse
+from backend.repositories.tasks_repository import TaskRepository
+from backend.schemas.tasks_schema import TaskResponse, TaskCreate, TaskUpdate, TaskListResponse
 
 tasks_router = APIRouter(prefix="/api/tasks", tags=["Задания ямоборцев"])
 
