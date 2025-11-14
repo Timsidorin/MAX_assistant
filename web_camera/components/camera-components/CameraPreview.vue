@@ -51,7 +51,6 @@ const capturePhoto = () => {
   if (!videoElement.value || !mediaStream.value) {
     throw new Error('Камера не активна');
   }
-
   const video = videoElement.value;
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d');

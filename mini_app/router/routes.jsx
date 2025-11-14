@@ -1,14 +1,13 @@
 import {Navigate} from "react-router";
 import {Layout} from "../layout/Layout.jsx";
-import {CreatePage} from "../pages/CreatePage.jsx";
-import {ProfilePage} from "../pages/ProfilePage.jsx";
-import {ManualCreatePage} from "../pages/ManualCreatePage.jsx";
-import {SelectedPositionPage} from "../pages/SelectedPositionPage.jsx";
+import {CreatePage, ManualCreatePage, ProfilePage, SelectedPositionPage, SendReportPage} from "@pages";
+import {checkStartParam} from "./checkStartParams.js";
 
 export const routes = [
     {
         path: "/",
         element: <><Layout /><Navigate to="/create" replace /></>,
+        loader: checkStartParam,
         children: [
             {
                 path: "create",
@@ -27,5 +26,9 @@ export const routes = [
     {
         path: "selected-position",
         element: <SelectedPositionPage/>,
+    },
+    {
+        path: "send-report/:uuid",
+        element: <SendReportPage/>,
     }
 ]
