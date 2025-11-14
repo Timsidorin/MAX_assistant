@@ -13,12 +13,14 @@ from email import encoders
 from typing import Optional, List
 from dotenv import load_dotenv
 
+from backend.core.config import configs
+
 load_dotenv()
 
-MAILRU_SMTP_HOST = os.getenv('MAILRU_SMTP_HOST', 'smtp.mail.ru')
-MAILRU_SMTP_PORT = int(os.getenv('MAILRU_SMTP_PORT', '465'))
-MAILRU_SMTP_USER = os.getenv('MAILRU_SMTP_USER')
-MAILRU_SMTP_PASSWORD = os.getenv('MAILRU_SMTP_PASSWORD')
+MAILRU_SMTP_HOST = configs.MAILRU_SMTP_HOST
+MAILRU_SMTP_PORT = configs.MAILRU_SMTP_PORT
+MAILRU_SMTP_USER = configs.MAILRU_SMTP_USER
+MAILRU_SMTP_PASSWORD = configs.MAILRU_SMTP_PASSWORD
 
 
 class EmailService:
