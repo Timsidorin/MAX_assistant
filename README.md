@@ -66,6 +66,7 @@
 
 - ✅ **Docker** и **Docker Compose**
 - ✅ **Python 3.10+** (для локального запуска без Docker)
+- ✅ **NODE.JS** (для локального запуска без Docker)
 - ✅ Доступ к следующим API сервисам:
   - GigaChat API
   - MailRu SMTP
