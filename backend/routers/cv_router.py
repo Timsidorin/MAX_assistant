@@ -1,10 +1,13 @@
+# backend/routers/cv_router.py
+
+from functools import lru_cache
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Annotated
 import base64
 from datetime import datetime
 import uuid
 
-from backend.core.database import get_async_session
+from backend.depends import AsyncSessionDep
 from backend.schemas.cv_schema import (
     ImageBase64Input, MultipleImagesBase64Input, VideoBase64Input,
     DetectionResponse, MultipleDetectionResponse, VideoDetectionResponse
@@ -14,25 +17,27 @@ from backend.services.pothole_detection_service import PotholeDetectionService
 cv_router = APIRouter(prefix="/api/detect", tags=["Анализ дорожного покрытия"])
 
 
+@lru_cache()
+def get_pothole_detection_service():
+    """Singleton для PotholeDetectionService"""
+    return PotholeDetectionService()
+
+
+# Создаём Annotated тип для удобства
+PotholeServiceDep = Annotated[PotholeDetectionService, Depends(get_pothole_detection_service)]
+
+
 @cv_router.post("/image", summary="Обработка одного изображения", response_model=DetectionResponse)
 async def detect_single_image(
-        payload: ImageBase64Input,
-        db: AsyncSession = Depends(get_async_session)
+    payload: ImageBase64Input,
+    db: AsyncSessionDep,
+    service: PotholeServiceDep
 ):
-    """
-    Обработка одного изображения из base64 строки
-    Пример payload :
-    {
-        "image_base64": "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBD...",
-        "user_id": "user123",
-        "latitude": "55.7558",
-        "longitude": "37.6173"
-    }
-    """
     try:
         image_base64 = payload.image_base64
         if ',' in image_base64:
             image_base64 = image_base64.split(',', 1)[1]
+
         try:
             image_bytes = base64.b64decode(image_base64)
         except Exception as e:
@@ -47,7 +52,6 @@ async def detect_single_image(
                 detail="Размер изображения превышает 10 MB"
             )
 
-        service = PotholeDetectionService()
         if not payload.filename:
             timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
             unique_id = str(uuid.uuid4())[:8]
@@ -63,6 +67,7 @@ async def detect_single_image(
         )
 
         return result
+
     except HTTPException as he:
         raise he
     except Exception as e:
@@ -71,10 +76,12 @@ async def detect_single_image(
             detail=f"Ошибка при обработке изображения: {str(e)}"
         )
 
+
 @cv_router.post("/images", summary="Обработка нескольких изображений", response_model=MultipleDetectionResponse)
 async def detect_multiple_images(
-        payload: MultipleImagesBase64Input,
-        db: AsyncSession = Depends(get_async_session)
+    payload: MultipleImagesBase64Input,
+    db: AsyncSessionDep,
+    service: PotholeServiceDep
 ):
     try:
         if not payload.images_base64:
@@ -83,7 +90,6 @@ async def detect_multiple_images(
         if len(payload.images_base64) > 10:
             raise HTTPException(status_code=400, detail="Максимум 10 изображений")
 
-        service = PotholeDetectionService()
         decoded_images = []
         for idx, img_base64 in enumerate(payload.images_base64):
             try:
@@ -91,14 +97,16 @@ async def detect_multiple_images(
                     img_base64 = img_base64.split(',', 1)[1]
 
                 image_bytes = base64.b64decode(img_base64)
+
                 if payload.filenames and idx < len(payload.filenames):
                     filename = payload.filenames[idx]
                 else:
-                    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     unique_id = str(uuid.uuid4())[:8]
                     filename = f"pothole_{timestamp}_{unique_id}_{idx}.jpg"
 
                 decoded_images.append((image_bytes, filename))
+
             except Exception as e:
                 raise HTTPException(
                     status_code=400,
@@ -110,6 +118,7 @@ async def detect_multiple_images(
             input_data=payload,
             db=db
         )
+
         return result
 
     except HTTPException as he:
@@ -120,24 +129,15 @@ async def detect_multiple_images(
 
 @cv_router.post("/video", summary="Обработка видео", response_model=VideoDetectionResponse)
 async def detect_video(
-        payload: VideoBase64Input,
-        db: AsyncSession = Depends(get_async_session)
+    payload: VideoBase64Input,
+    db: AsyncSessionDep,
+    service: PotholeServiceDep
 ):
-    """
-    Обработка видео из base64 строки
-
-    Пример payload:
-    {
-        "video_base64": "AAAAIGZ0eXBpc29tAAACAGlzb21...",
-        "user_id": "user123",
-        "latitude": "55.7558",
-        "longitude": "37.6173"
-    }
-    """
     try:
         video_base64 = payload.video_base64
         if ',' in video_base64:
             video_base64 = video_base64.split(',', 1)[1]
+
         try:
             video_bytes = base64.b64decode(video_base64)
         except Exception as e:
@@ -152,7 +152,6 @@ async def detect_video(
                 detail="Размер видео превышает 100 MB"
             )
 
-        service = PotholeDetectionService()
         if not payload.filename:
             timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
             unique_id = str(uuid.uuid4())[:8]
@@ -166,9 +165,10 @@ async def detect_video(
             filename=filename,
             db=db
         )
+
         return result
+
     except HTTPException as he:
         raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка: {str(e)}")
-

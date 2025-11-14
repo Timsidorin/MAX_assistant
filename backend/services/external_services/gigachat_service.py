@@ -1,9 +1,5 @@
 # backend/services/gigachat_service.py
 
-"""
-GigaChat Service для генерации текста заявлений.
-"""
-
 import os
 import time
 from typing import Optional
@@ -41,52 +37,90 @@ class GigaChatService:
         description: str,
         total_potholes: int,
         max_risk: float,
-        priority: str
+        priority: str,
+        person_name: str = "Заявитель"
     ) -> str:
         """Генерирует текст заявления о дорожной проблеме."""
         try:
             client = self._get_client()
-
             prompt = f"""Составь официальное заявление в управление дорожной деятельности города {city} о проблеме с дорожным покрытием.
 
-Адрес: {address}
+Заявитель: {person_name}
+Адрес проблемы: {address}
 Описание: {description}
 Обнаружено дефектов: {total_potholes}
 Уровень опасности: {max_risk:.1f}%
 Приоритет: {priority}
 
-Требования:
-- Официальный стиль
-- Краткость (до 200 слов)
-- Указать адрес и описание
-- Просьба о ремонте
-- Ссылка на приложенные материалы
+НАЧИНАЙ текст так:
+Заявление
+В [организация]
+От: {person_name}
 
-Начинай сразу с текста заявления."""
+ОБЯЗАТЕЛЬНО:
+- НЕ УКАЗЫВАЙ адрес проживания заявителя, телефон, email
+- Укажи только ФИО: {person_name} в начале (От:) и в конце (Подпись)
+- В описании обязательно приведи адрес ПРОБЛЕМЫ в точности как передано (никаких изменений и сокращений): {address}
+- Укажи уровень опасности {max_risk:.1f}% и количество дефектов {total_potholes}
+- Упомяни приложенные фотографии
+- Закончи просьбой о ремонте и ФИО
+
+Кратко, официально, 150-200 слов. БЕЗ контактных данных заявителя!"""
 
             messages = [Messages(role=MessagesRole.USER, content=prompt)]
-
-            response = client.chat(Chat(messages=messages, temperature=0.7, max_tokens=500))
-
+            response = client.chat(Chat(messages=messages, temperature=0.5, max_tokens=400))
             generated_text = response.choices[0].message.content
             return generated_text.strip()
-
         except Exception as e:
-            return self._generate_fallback_text(city, address, description, total_potholes, max_risk)
+            print(f"[GigaChat Service] Error generating text: {e}")
+            return self._generate_fallback_text(
+                city=city,
+                address=address,
+                description=description,
+                total_potholes=total_potholes,
+                max_risk=max_risk,
+                priority=priority,
+                person_name=person_name
+            )
 
-    def _generate_fallback_text(self, city: str, address: str, description: str, total_potholes: int, max_risk: float) -> str:
-        return f"""Заявление о дефектах дорожного покрытия
+    def _generate_fallback_text(
+        self,
+        city: str,
+        address: str,
+        description: str,
+        total_potholes: int,
+        max_risk: float,
+        priority: str,
+        person_name: str = "Заявитель"
+    ) -> str:
+        """Резервный текст на случай ошибки GigaChat."""
+        current_date = time.strftime('%d.%m.%Y')
+        organization_name = "Управление дорожной деятельности администрации города " + city
 
-Адрес: {address}
+        return f"""Заявление
 
-По указанному адресу обнаружены дефекты дорожного покрытия: {description}
+В {organization_name}
 
-Количество дефектов: {total_potholes}
-Уровень опасности: {max_risk:.1f}%
+От: {person_name}
 
-Прошу провести осмотр и ремонт дорожного покрытия в кратчайшие сроки.
-К заявлению прилагаются фото и видеоматериалы.
+Обращаюсь с заявлением о неудовлетворительном состоянии дорожного покрытия по адресу: {address}.
 
-Дата: {time.strftime('%d.%m.%Y')}"""
+Описание проблемы: {description}
 
+На указанном участке обнаружены дефекты дорожного покрытия:
+- Количество дефектов: {total_potholes}
+- Уровень опасности: {max_risk:.1f}%
+- Приоритет: {priority.upper()}
 
+Данные дефекты представляют угрозу безопасности дорожного движения и требуют срочного устранения.
+
+Прошу:
+1. Провести осмотр указанного участка в кратчайшие сроки
+2. Организовать ремонтные работы для устранения выявленных дефектов
+3. При необходимости установить предупреждающие знаки
+
+К заявлению прилагаются фотографии дефектов ({total_potholes} шт.).
+
+Дата: {current_date}
+
+{person_name}"""

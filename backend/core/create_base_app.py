@@ -1,17 +1,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from httpx import Request
-
 from loguru import logger
 from typing import AsyncGenerator
 from contextlib import asynccontextmanager
+from starlette.responses import HTMLResponse
+import asyncio
+import os
 
-from starlette.responses import HTMLResponse, JSONResponse
-
-
-
-
-
+from max_bot.main import dp, bot
 
 
 def create_base_app(configs):
@@ -19,7 +15,24 @@ def create_base_app(configs):
     async def lifespan(app: FastAPI) -> AsyncGenerator[dict, None]:
         """Управление жизненным циклом приложения."""
         logger.info("Инициализация приложения...")
+
+        model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'cv_models', 'best.pt'))
+        if os.path.isfile(model_path):
+            logger.info("Модель найдена")
+        else:
+            logger.error("Модель не найдена, скачайте с облака: https://disk.yandex.ru/d/BQkOm1xGN9l6hQ")
+
+        bot_task = asyncio.create_task(dp.start_polling(bot))
+        logger.info("Бот запущен в фоновом режиме")
+
         yield
+
+        bot_task.cancel()
+        try:
+            await bot_task
+        except asyncio.CancelledError:
+            logger.info("Бот остановлен")
+
         logger.info("Завершение работы приложения...")
 
     app = FastAPI(
@@ -34,7 +47,6 @@ def create_base_app(configs):
         allow_methods=["*"],
         allow_headers=["*"],
     )
-
 
     @app.get("/", response_class=HTMLResponse)
     def root():
