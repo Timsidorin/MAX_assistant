@@ -4,13 +4,14 @@
 
 from fastapi import FastAPI, APIRouter
 
+from backend.core.config import configs
+from backend.core.create_base_app import create_base_app
 from backend.models.users_model import User
 from backend.models.report_model import ReportStatus, ReportPriority
 from backend.routers.cv_router import cv_router
 from backend.routers.reports_router import report_router
 from backend.routers.users_router import users_router
-from core.config import configs
-from core.create_base_app import create_base_app
+
 
 
 

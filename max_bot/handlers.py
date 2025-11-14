@@ -1,43 +1,19 @@
-import asyncio
 import logging
-import os
-from dotenv import load_dotenv
 from typing import Optional
+from maxapi.types import MessageCreated, MessageCallback, Attachment
 
-from maxapi import Bot, Dispatcher
-from maxapi.filters.callback_payload import CallbackPayload
-from maxapi.utils.inline_keyboard import InlineKeyboardBuilder
-from maxapi.types import (
-    CommandStart,
-    MessageCreated,
-    MessageCallback,
-    Attachment,
-    CallbackButton, OpenAppButton,
-)
-
-from max_bot import instruction
 from backend.depends import get_user_service
 from backend.schemas.users_schema import UserCreate
+from max_bot.keyboards import get_main_keyboard, InstructionPayload
+from max_bot.instruction import instruction_text
 
-
-load_dotenv(dotenv_path="../.env", verbose=True)
-logging.basicConfig(level=logging.INFO)
-
-TOKEN = os.getenv("TOKEN_BOT")
-WEBAPP_URL = os.getenv("WEBAPP_URL")
-
-bot = Bot(TOKEN)
-dp = Dispatcher()
-
-
-class InstructionPayload(CallbackPayload, prefix='instruction'):
-    action: str = "show"
 
 async def register_or_get_user(
         max_user_id: str,
         first_name: str,
         last_name: Optional[str] = None
 ) -> bool:
+    """Регистрация или получение существующего пользователя"""
     service = await get_user_service()
 
     try:
@@ -63,12 +39,11 @@ async def register_or_get_user(
         return False
 
 
-@dp.message_created(CommandStart())
-async def start_command(event: MessageCreated):
+async def start_handler(event: MessageCreated, bot):
+    """Обработчик команды /start"""
     user_id = event.from_user.user_id
     first_name = event.from_user.first_name
     last_name = event.from_user.last_name or "Unknown"
-    event.from_user
 
     is_new_user = await register_or_get_user(
         max_user_id=user_id,
@@ -88,20 +63,6 @@ async def start_command(event: MessageCreated):
         attachments=[photo_attachment]
     )
 
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        OpenAppButton(
-            text="Открыть приложение",
-            web_app=f"https://max.ru/t86_hakaton_bot?startapp",
-        )
-    )
-    builder.row(
-        CallbackButton(
-            text="Инструкция",
-            payload=InstructionPayload().pack(),
-        )
-    )
-
     welcome_text = f"Привет, {first_name}!\nЯ чат-бот, который позволяет отправлять обращения по состоянию дороги в различные инстанции твоего региона.\nДля того, чтобы отправить обращение, нажми кнопку ниже 👇"
 
     if is_new_user:
@@ -109,20 +70,11 @@ async def start_command(event: MessageCreated):
 
     await event.message.answer(
         text=welcome_text,
-        attachments=[builder.as_markup()]
+        attachments=[get_main_keyboard()]
     )
 
 
-@dp.message_callback(InstructionPayload.filter())
-async def handle_instruction_callback(event: MessageCallback, payload: InstructionPayload):
-    instruction_text = instruction
-    await event.message.answer(instruction_text)
-
-
-async def main():
-    logging.info("Bot started")
-    await dp.start_polling(bot)
-
-
-if __name__ == '__main__':
-    asyncio.run(main())
+async def instruction_callback_handler(event: MessageCallback, payload: InstructionPayload):
+    """Обработчик callback для показа инструкции"""
+    instruction = instruction_text
+    await event.message.answer(instruction)

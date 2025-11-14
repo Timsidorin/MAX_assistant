@@ -15,4 +15,4 @@ ENV PYTHONPATH=/app
 
 EXPOSE 8005
 
-CMD ["/bin/bash", "-c", "python backend/bot.py & python backend/main.py"]
+CMD ["/bin/bash", "-c", "python backend/main.py"]
