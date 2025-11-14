@@ -1,0 +1,16 @@
+.page {
+    padding: 20px 0;
+}
+
+.header {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.actions {
+    width: 100%;
+}
+
+.body {
+    width: 100%;
+}

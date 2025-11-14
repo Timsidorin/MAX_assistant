@@ -20,7 +20,7 @@ export const routes = [
         ],
     },
     {
-        path: "manual-create",
+        path: "manual-create/:long/:lat",
         element: <ManualCreatePage/>,
     },
     {

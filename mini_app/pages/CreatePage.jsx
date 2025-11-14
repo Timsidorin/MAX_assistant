@@ -37,5 +37,6 @@ export function CreatePage() {
 
 function linkScanner() {
     //пока в максе нет доступа к камере и gps делаем так
+    window.WebApp.close();
     window.open(__BASE__SCANNER__URL__ + `?user_id=${window.WebApp.initDataUnsafe.user.id}`);
 }

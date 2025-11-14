@@ -218,12 +218,12 @@
         max-height: 95%;
     }
 
-    /* Показываем кнопку назад на мобильных */
+
     .backButton {
         display: block;
     }
 
-    /* Увеличиваем зону клика для навигации */
+
     .navButton {
         width: 60px;
         height: 60px;

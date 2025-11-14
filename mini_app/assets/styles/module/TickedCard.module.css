@@ -1,30 +1,221 @@
 .card {
-    padding: 16px;
+    background: light-dark(#edeef2, #17181c);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border: 1px solid light-dark(#e8e8e8, #191a1e);
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+.cardHeader {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.statusIcon {
+    width: 32px;
+    height: 32px;
     border-radius: 8px;
-    border: 1px solid #e0e0e0;
-    margin-bottom: 12px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+}
+
+.statusIcon.draft {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.statusIcon.submitted {
+    background: #d1edff;
+    color: #0c5460;
+}
+
+.headerInfo {
+    flex: 1;
+}
+
+.address {
+    margin: 0 0 8px 0 !important;
+    font-size: 16px;
+    line-height: 1.4;
+}
+
+.metaInfo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.date {
+    font-size: 12px;
+    color: #666;
+}
+
+.priorityBadge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.priorityBadge.low {
+    background: #d4edda;
+    color: #155724;
+}
+
+.priorityBadge.medium {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.priorityBadge.high {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.cardContent {
+    margin-bottom: 16px;
+}
+
+.stats {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 16px;
+}
+
+.statItem {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    box-sizing: border-box;
-    width: fit-content;
+    align-items: center;
 }
 
-
-.status {
-    display: inline-block;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 0.8rem;
+.statLabel {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 4px;
 }
 
-.statusActive {
-    background: #e6f7e6;
-    color: #2e7d32;
+.statValue {
+    font-size: 18px;
+    font-weight: 700;
+    color: light-dark(#17181c, #edeef2);
 }
 
-.statusCompleted {
-    background: #e3f2fd;
-    color: #1565c0;
+.riskMeter {
+    margin-bottom: 12px;
+}
+
+.riskLabel {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: #666;
+}
+
+.riskValue {
+    font-weight: 600;
+    color: #1a1a1a;
+}
+
+.riskBar {
+    height: 6px;
+    background: #f0f0f0;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.riskFill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.riskFill.low {
+    background: #28a745;
+}
+
+.riskFill.medium {
+    background: #ffc107;
+}
+
+.riskFill.high {
+    background: #dc3545;
+}
+
+.imagesPreview {
+    margin-top: 12px;
+}
+
+.imagesLabel {
+    font-size: 12px;
+    color: #666;
+}
+
+.cardFooter {
+    border-top: 1px solid #f0f0f0;
+    padding-top: 16px;
+}
+
+.actionButton {
+    width: 100%;
+    justify-content: center;
+}
+
+.submittedInfo {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.submittedBadge {
+    color: #28a745;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.submittedDate {
+    font-size: 12px;
+    color: #666;
+}
+
+.cardsContainer {
+    padding-bottom: 80px;
+}
+
+.emptyState {
+    text-align: center;
+    padding: 40px 20px;
+    background: white;
+    border-radius: 12px;
+    border: 2px dashed #e8e8e8;
+}
+
+.emptyIcon {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+.emptyText {
+    display: block;
+    margin-bottom: 16px;
+    color: #666;
+    font-size: 16px;
+}
+
+.emptyAction {
+    font-size: 14px;
 }

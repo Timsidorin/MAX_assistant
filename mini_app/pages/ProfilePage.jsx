@@ -1,5 +1,7 @@
+import {BaseProfileContainer} from "@components/profilePage/BaseProfile.jsx";
+
 export function ProfilePage() {
     return (
-        <span>профиль</span>
+        <BaseProfileContainer/>
     );
 }
