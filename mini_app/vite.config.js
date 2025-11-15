@@ -19,7 +19,7 @@ export default defineConfig({
     },
     //для разработки внутри мини аппы
     server: {
-        allowedHosts: ['creakily-patient-eland.cloudpub.ru'],
+        allowedHosts: ['creakily-patient-eland.cloudpub.ru', 'pulseai.knastu.ru'],
         port: 8008,
         host: '0.0.0.0',
     },
