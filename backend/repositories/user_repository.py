@@ -20,7 +20,7 @@ class UserRepository:
             username=user_data.username,
         )
         self.session.add(new_user)
-        await self.session.flush()
+        await self.session.commit()
         await self.session.refresh(new_user)
         return new_user
 
@@ -68,13 +68,13 @@ class UserRepository:
                 setattr(user, field, value)
 
         self.session.add(user)
-        await self.session.flush()
+        await self.session.commit()
         await self.session.refresh(user)
         return user
 
     async def update(self, user: User) -> User:
         self.session.add(user)
-        await self.session.flush()
+        await self.session.commit()
         await self.session.refresh(user)
         return user
 
@@ -85,7 +85,7 @@ class UserRepository:
             return False
 
         await self.session.delete(user)
-        await self.session.flush()
+        await self.session.commit()
         return True
 
     async def get_all_users(self) -> list[User]:

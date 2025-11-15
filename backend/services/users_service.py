@@ -196,6 +196,7 @@ class UserService:
             user.current_status = USER_LEVELS[new_level]['name']
 
             self.session.add(user)
+            await self.session.commit()
             await self.session.refresh(user)
 
             logger.info(

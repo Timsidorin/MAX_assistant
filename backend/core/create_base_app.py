@@ -6,8 +6,37 @@ from contextlib import asynccontextmanager
 from starlette.responses import HTMLResponse
 import asyncio
 import os
+import sys
 
 from max_bot.main import dp, bot
+
+logger.remove()
+logger.add(
+    sys.stderr,
+    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    colorize=True
+)
+
+logger.add(
+    "logs/app_{time:YYYY-MM-DD}.log",
+    rotation="500 MB",
+    retention="10 days",
+    level="DEBUG",
+    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
+    compression="zip"
+)
+
+logger.add(
+    "logs/error_{time:YYYY-MM-DD}.log",
+    rotation="100 MB",
+    retention="1 month",
+    level="ERROR",
+    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
+    backtrace=True,
+    diagnose=True,
+    compression="zip"
+)
 
 
 def create_base_app(configs):

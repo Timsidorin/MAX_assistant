@@ -81,12 +81,6 @@ class ReportResponse(BaseModel):
     description: Optional[str]
     comment: Optional[str]
     created_at: datetime
-    submitted_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
-    ai_agent_task_id: Optional[str] = None
-    ai_agent_status: Optional[str] = None
-    organization_name: Optional[str] = None
-    external_tracking_id: Optional[str] = None
 
     class Config:
         from_attributes = True
