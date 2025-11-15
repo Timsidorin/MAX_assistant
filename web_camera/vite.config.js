@@ -16,6 +16,7 @@ export default defineConfig({
     },
     server: {
         allowedHosts: ['untimely-eligible-pheasant.cloudpub.ru'],
-        port: 8006
+        port: 8006,
+        host: '0.0.0.0',
     },
 })
