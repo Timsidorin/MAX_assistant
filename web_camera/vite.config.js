@@ -15,6 +15,7 @@ export default defineConfig({
         __BASE__PYTHON__URL__: JSON.stringify('https://zestfully-champion-parakeet.cloudpub.ru')
     },
     server: {
-        allowedHosts: ['untimely-eligible-pheasant.cloudpub.ru']
+        allowedHosts: ['untimely-eligible-pheasant.cloudpub.ru'],
+        port: 8006
     },
 })

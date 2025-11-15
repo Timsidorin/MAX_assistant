@@ -19,6 +19,7 @@ export default defineConfig({
     },
     //для разработки внутри мини аппы
     server: {
-        allowedHosts: ['creakily-patient-eland.cloudpub.ru']
+        allowedHosts: ['creakily-patient-eland.cloudpub.ru'],
+        port: 8008,
     },
 })
