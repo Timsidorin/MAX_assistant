@@ -10,7 +10,7 @@ from max_bot.keyboards import InstructionPayload
 
 
 
-load_dotenv(dotenv_path="../.env", verbose=True)
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"), verbose=True)
 logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.getenv("TOKEN_BOT")

@@ -14,7 +14,7 @@ from backend.models.report_model import ReportStatus, ReportPriority, Report
 from backend.schemas.report_schema import (
     ReportCreateDraft, ReportUpdate,
     ReportDraftCreatedResponse, ReportResponse, ReportSubmitResponse,
-    ReportListResponse, ReportListItem
+    ReportListResponse, ReportListItem, ReportGeoPoint, ReportStatsResponse
 )
 
 from backend.repositories.ReportRepository import ReportRepository
@@ -23,6 +23,7 @@ from backend.services.users_service import UserService
 from backend.services.external_services.email_service import EmailService
 from backend.services.external_services.gigachat_service import GigaChatService
 from backend.services.document_service import DocumentService
+from backend.services.notification_service import notify_user
 from backend.schemas.users_schema import UserUpdate
 
 logger = logging.getLogger(__name__)
@@ -128,6 +129,7 @@ class ReportService:
             low_count=report.low_count,
             status=report.status.value,
             priority=report.priority.value,
+            confirmations=report.confirmations or 0,
             description=report.description,
             comment=report.comment,
             created_at=report.created_at,
@@ -211,6 +213,13 @@ class ReportService:
         report.ai_agent_status = "processing"
         report = await self.repository.update(report)
         logger.info(f"Report {report_uuid} submitted, task_id={task_id}")
+
+        if report.user_id:
+            await notify_user(
+                report.user_id,
+                f"📨 Заявка по адресу «{report.address}» принята в обработку!\n"
+                f"Приоритет: {report.priority.value}. Ищем контакты ответственной организации…"
+            )
 
         background_tasks.add_task(
             self._process_and_send_complaint_wrapper,
@@ -337,10 +346,23 @@ class ReportService:
                 report.status = ReportStatus.IN_REVIEW
                 report.comment = f"Заявление отправлено на {email_to} с {len(photo_attachments)} фото"
                 logger.info(f"[Task {task_id}] Successfully sent to {email_to}")
+                if report.user_id:
+                    await notify_user(
+                        report.user_id,
+                        f"✅ Готово! Заявление о дефектах по адресу «{report.address}» "
+                        f"отправлено в «{organization_name}».\n"
+                        f"Очки ямоборца уже начислены — проверь профиль 🏆"
+                    )
             else:
                 report.ai_agent_status = "failed"
                 report.comment = "Ошибка при отправке email"
                 logger.error(f"[Task {task_id}] Failed to send email")
+                if report.user_id:
+                    await notify_user(
+                        report.user_id,
+                        f"⚠️ Не удалось отправить заявление по адресу «{report.address}». "
+                        f"Попробуйте повторить позже."
+                    )
 
             await repository.update(report)
 
@@ -451,6 +473,51 @@ class ReportService:
 
         logger.debug(f"Retrieved {len(items)}/{total} reports")
         return ReportListResponse(total=total, items=items)
+
+    async def get_geo_list(self) -> List[ReportGeoPoint]:
+        """Список точек дефектов для карты"""
+        reports = await self.repository.get_geo_list()
+        points = []
+        for r in reports:
+            try:
+                points.append(ReportGeoPoint(
+                    uuid=r.uuid,
+                    latitude=float(r.latitude),
+                    longitude=float(r.longitude),
+                    address=r.address,
+                    status=r.status.value,
+                    priority=r.priority.value,
+                    max_risk=r.max_risk,
+                    total_potholes=r.total_potholes,
+                    confirmations=r.confirmations or 0,
+                    created_at=r.created_at,
+                ))
+            except (TypeError, ValueError):
+                logger.warning(f"Skipping report {r.uuid} with invalid coordinates")
+        return points
+
+    async def get_stats(self) -> ReportStatsResponse:
+        """Сводная статистика по заявкам для тикера на карте"""
+        stats = await self.repository.get_stats()
+        return ReportStatsResponse(**stats)
+
+    async def confirm_report(self, report_uuid: uuid.UUID) -> dict:
+        """Подтверждение дефекта другим пользователем ('я тоже тут видел')"""
+        report = await self.repository.get_by_uuid(report_uuid)
+        if not report:
+            raise HTTPException(status_code=404, detail="Заявка не найдена")
+        if report.status == ReportStatus.DRAFT:
+            raise HTTPException(status_code=400, detail="Нельзя подтвердить черновик")
+
+        report.confirmations = (report.confirmations or 0) + 1
+        report.priority = report.auto_priority
+        await self.repository.update(report)
+        logger.info(f"Report {report_uuid} confirmed, total confirmations={report.confirmations}")
+        return {
+            "uuid": str(report_uuid),
+            "confirmations": report.confirmations,
+            "priority": report.priority.value,
+        }
 
     async def delete_draft(self, report_uuid: uuid.UUID) -> dict:
         """Удалить черновик"""

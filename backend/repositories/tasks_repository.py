@@ -4,8 +4,8 @@ from sqlalchemy.future import select
 from sqlalchemy import update, delete
 import uuid
 
-from models.tasks_model import Task
-from schemas.tasks_schema import TaskCreate, TaskUpdate
+from backend.models.tasks_model import Task
+from backend.schemas.tasks_schema import TaskCreate, TaskUpdate
 
 
 class TaskRepository:

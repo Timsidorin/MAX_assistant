@@ -1,5 +1,5 @@
 import {ToolButton, Flex, Typography} from "@maxhub/max-ui";
-import {FiUser, FiPlus} from "react-icons/fi";
+import {FiUser, FiPlus, FiMap} from "react-icons/fi";
 import {NavLink} from "react-router";
 
 export function BottomToolBar() {
@@ -36,6 +36,25 @@ export function BottomToolBar() {
                     >
                         <Typography.Action>
                             Создать
+                        </Typography.Action>
+                    </ToolButton>
+                </NavLink>
+                <NavLink
+                    to='/map'
+                    style={{
+                        textDecoration: 'none',
+                        color: 'inherit',
+                        flex: 1,
+                        display: 'flex'
+                    }}
+                >
+                    <ToolButton
+                        icon={<FiMap size={24}/>}
+                        onClick={() => {}}
+                        style={{ width: '100%' }}
+                    >
+                        <Typography.Action>
+                            Карта
                         </Typography.Action>
                     </ToolButton>
                 </NavLink>

@@ -13,7 +13,7 @@ def get_main_keyboard():
     builder.row(
         OpenAppButton(
             text="Открыть приложение",
-            web_app=f"https://max.ru/t86_hakaton_bot?startapp",
+            web_app="https://max.ru/t468_hakaton_max_bot?startapp",
         )
     )
     builder.row(

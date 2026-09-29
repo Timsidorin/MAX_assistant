@@ -76,6 +76,59 @@ class ReportRepository:
 
         return reports, total
 
+    async def get_geo_list(self) -> List[Report]:
+        """Все заявки с координатами для отображения на карте"""
+        stmt = (
+            select(Report)
+            .where(
+                Report.status != ReportStatus.DRAFT,
+                Report.latitude.isnot(None),
+                Report.longitude.isnot(None),
+            )
+            .order_by(Report.created_at.desc())
+        )
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
+
+    async def get_stats(self) -> dict:
+        """Агрегированная статистика по всем заявкам"""
+        base = select(Report).where(Report.status != ReportStatus.DRAFT)
+
+        total = await self.db.execute(select(func.count()).select_from(base.subquery()))
+        critical = await self.db.execute(
+            select(func.count()).select_from(base.subquery())
+            .where(Report.priority == ReportPriority.CRITICAL)
+        )
+        high = await self.db.execute(
+            select(func.count()).select_from(base.subquery())
+            .where(Report.priority == ReportPriority.HIGH)
+        )
+        potholes = await self.db.execute(
+            select(func.coalesce(func.sum(Report.total_potholes), 0))
+            .where(Report.status != ReportStatus.DRAFT)
+        )
+        worst = await self.db.execute(
+            select(Report).where(Report.status != ReportStatus.DRAFT)
+            .order_by(Report.max_risk.desc()).limit(1)
+        )
+        last = await self.db.execute(
+            select(Report).where(Report.status != ReportStatus.DRAFT)
+            .order_by(Report.created_at.desc()).limit(1)
+        )
+
+        worst_report = worst.scalar_one_or_none()
+        last_report = last.scalar_one_or_none()
+
+        return {
+            "total_reports": total.scalar() or 0,
+            "critical_count": critical.scalar() or 0,
+            "high_count": high.scalar() or 0,
+            "total_potholes": potholes.scalar() or 0,
+            "worst_address": worst_report.address if worst_report else None,
+            "worst_risk": worst_report.max_risk if worst_report else 0.0,
+            "last_report_at": last_report.created_at if last_report else None,
+        }
+
     async def count_submitted_reports_by_user(self, user_id: int) -> int:
         """Подсчет отправленных заявок пользователя"""
         stmt = select(func.count(Report.uuid)).where(

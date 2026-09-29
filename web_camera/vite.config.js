@@ -12,10 +12,10 @@ export default defineConfig({
         }
     },
     define: {
-        __BASE__PYTHON__URL__: JSON.stringify('https://zestfully-champion-parakeet.cloudpub.ru')
+        __BASE__PYTHON__URL__: JSON.stringify('https://excellently-sterling-roundworm.cloudpub.ru')
     },
     server: {
-        allowedHosts: ['untimely-eligible-pheasant.cloudpub.ru', 'pulseai.knastu.ru'],
+        allowedHosts: ['permissibly-still-badger.cloudpub.ru', 'avowedly-oriented-dodo.cloudpub.ru'],
         port: 8006,
         host: '0.0.0.0',
     },

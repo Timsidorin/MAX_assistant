@@ -14,12 +14,12 @@ export default defineConfig({
         }
     },
     define: {
-        __BASE__PYTHON__URL__: JSON.stringify('https://zestfully-champion-parakeet.cloudpub.ru'),
-        __BASE__SCANNER__URL__: JSON.stringify('https://untimely-eligible-pheasant.cloudpub.ru'),
+        __BASE__PYTHON__URL__: JSON.stringify('https://excellently-sterling-roundworm.cloudpub.ru'),
+        __BASE__SCANNER__URL__: JSON.stringify('https://permissibly-still-badger.cloudpub.ru'),
     },
     //для разработки внутри мини аппы
     server: {
-        allowedHosts: ['creakily-patient-eland.cloudpub.ru', 'pulseai.knastu.ru'],
+        allowedHosts: ['ravenously-mutual-iguana.cloudpub.ru', 'pulseai.knastu.ru', 'avowedly-oriented-dodo.cloudpub.ru'],
         port: 8008,
         host: '0.0.0.0',
     },

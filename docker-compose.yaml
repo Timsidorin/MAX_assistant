@@ -1,0 +1,52 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASS:-admin}
+      POSTGRES_DB: ${DB_NAME:-max_assistant}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ports:
+      - "5432:5432"
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: ${DB_NAME:-max_assistant}
+      HOST: 0.0.0.0
+      PORT: "8005"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8005:8005"
+
+  web_camera:
+    build:
+      context: ./web_camera
+    restart: unless-stopped
+    ports:
+      - "8006:3000"
+
+  mini_app:
+    build:
+      context: ./mini_app
+    restart: unless-stopped
+    ports:
+      - "8008:3000"
+
+volumes:
+  pgdata:

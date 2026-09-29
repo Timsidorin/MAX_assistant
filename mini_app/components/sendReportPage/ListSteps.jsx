@@ -1,6 +1,7 @@
 import {Flex, CellSimple, Button, Typography, IconButton} from "@maxhub/max-ui";
 import {StepNumber} from "@components/sendReportPage/StepNumber.jsx";
 import {postTicket} from "@api/ticket.js";
+import toast from "react-hot-toast";
 import {useParams, useNavigate} from "react-router";
 import { FiArrowLeft } from "react-icons/fi";
 import {PlugLoader} from "@components/sendReportPage/PlugLoader.jsx";
@@ -21,11 +22,14 @@ export function ListStepsContainer() {
     const postReport = async () => {
         try {
             setStatus(true);
-            await postTicket(params.uuid);
-            navigate('/profile')
+            const response = await postTicket(params.uuid);
+            const pointsMap = {low: 10, medium: 20, high: 50, critical: 100};
+            const points = pointsMap[response?.data?.priority] || 10;
+            toast.success(`🎉 Заявка принята! +${points} очков ямоборца`, {duration: 4000});
+            setTimeout(() => navigate('/profile'), 1200);
         } catch (error) {
             console.error(error);
-        } finally {
+            toast.error('Не удалось отправить заявку');
             setStatus(false);
         }
     };

@@ -1,7 +1,7 @@
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.exc import IntegrityError
 
 from backend.models.users_model import User
@@ -93,3 +93,22 @@ class UserRepository:
         query = select(User)
         result = await self.session.execute(query)
         return list(result.scalars().all())
+
+    async def get_leaderboard(self, limit: int = 10) -> List[User]:
+        """Топ пользователей по очкам"""
+        query = (
+            select(User)
+            .order_by(User.total_points.desc(), User.sent_reports_count.desc())
+            .limit(limit)
+        )
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
+    async def get_user_rank(self, max_user_id: int) -> Optional[int]:
+        """Позиция пользователя в общем рейтинге по очкам"""
+        user = await self.get_user_by_max_user_id(max_user_id)
+        if not user:
+            return None
+        query = select(func.count(User.uuid)).where(User.total_points > user.total_points)
+        result = await self.session.execute(query)
+        return (result.scalar() or 0) + 1

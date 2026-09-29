@@ -1,6 +1,6 @@
 import {Navigate} from "react-router";
 import {Layout} from "../layout/Layout.jsx";
-import {CreatePage, ManualCreatePage, ProfilePage, SelectedPositionPage, SendReportPage} from "@pages";
+import {CreatePage, ManualCreatePage, MapPage, ProfilePage, SelectedPositionPage, SendReportPage} from "@pages";
 import {checkStartParam} from "./checkStartParams.js";
 
 export const routes = [
@@ -16,6 +16,10 @@ export const routes = [
             {
                 path: "profile",
                 element: <ProfilePage/>,
+            },
+            {
+                path: "map",
+                element: <MapPage/>,
             },
         ],
     },

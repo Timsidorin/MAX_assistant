@@ -5,10 +5,13 @@ from typing import Optional, Annotated
 import uuid
 
 from backend.depends import ReportServiceDep
+from typing import List
+
 from backend.schemas.report_schema import (
     ReportCreateDraft, ReportUpdate,
     ReportDraftCreatedResponse, ReportResponse, ReportListResponse,
-    ReportSubmitResponse, ReportStatusEnum, ReportPriorityEnum
+    ReportSubmitResponse, ReportStatusEnum, ReportPriorityEnum,
+    ReportGeoPoint, ReportStatsResponse
 )
 
 report_router = APIRouter(prefix="/api/reports", tags=["Заявки"])
@@ -45,6 +48,42 @@ async def submit_report(
     3. Отслеживать статус
     """
     return await report_service.submit_report(report_uuid, background_tasks)
+
+
+@report_router.get(
+    "/geo",
+    response_model=List[ReportGeoPoint],
+    summary="Точки дефектов для карты"
+)
+async def get_geo_reports(
+    report_service: ReportServiceDep = None
+):
+    """Все отправленные заявки с координатами для карты/теплокарты"""
+    return await report_service.get_geo_list()
+
+
+@report_router.get(
+    "/stats",
+    response_model=ReportStatsResponse,
+    summary="Сводная статистика для тикера"
+)
+async def get_stats(
+    report_service: ReportServiceDep = None
+):
+    """Всего заявок, критических, ям, самый опасный адрес, время последней заявки"""
+    return await report_service.get_stats()
+
+
+@report_router.post(
+    "/{report_uuid}/confirm",
+    summary="Подтвердить дефект"
+)
+async def confirm_report(
+    report_uuid: uuid.UUID,
+    report_service: ReportServiceDep = None
+):
+    """«Я тоже тут видел эту яму» — повышает приоритет заявки"""
+    return await report_service.confirm_report(report_uuid)
 
 
 @report_router.get(

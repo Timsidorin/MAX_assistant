@@ -8,7 +8,10 @@ from backend.models.report_model import ReportStatus, ReportPriority
 from backend.models.users_model import User
 from backend.repositories.ReportRepository import ReportRepository
 from backend.repositories.user_repository import UserRepository
-from backend.schemas.users_schema import UserResponse, UserCreate, UserUpdate
+from backend.schemas.users_schema import (
+    UserResponse, UserCreate, UserUpdate,
+    LeaderboardItem, LeaderboardResponse, UserRankResponse
+)
 
 logger = logging.getLogger(__name__)
 
@@ -137,6 +140,51 @@ class UserService:
 
         logger.info(f"User '{max_user_id}' level calculated: level={level}, points={total_points}")
         return result
+
+    async def get_leaderboard(self, limit: int = 10) -> LeaderboardResponse:
+        """Топ пользователей по очкам"""
+        users = await self.repository.get_leaderboard(limit)
+        total_users = len(await self.repository.get_all_users())
+        items = [
+            LeaderboardItem(
+                rank=idx,
+                max_user_id=u.max_user_id,
+                first_name=u.first_name,
+                last_name=u.last_name,
+                user_level=u.user_level,
+                current_status=u.current_status,
+                total_points=u.total_points,
+                sent_reports_count=u.sent_reports_count,
+            )
+            for idx, u in enumerate(users, start=1)
+        ]
+        return LeaderboardResponse(total_users=total_users, items=items)
+
+    async def get_user_rank(self, max_user_id: int) -> Optional[UserRankResponse]:
+        """Ранг пользователя и прогресс до следующего уровня"""
+        user = await self.repository.get_user_by_max_user_id(max_user_id)
+        if not user:
+            return None
+
+        rank = await self.repository.get_user_rank(max_user_id)
+        total_users = len(await self.repository.get_all_users())
+
+        USER_LEVELS = configs.USER_LEVELS
+        next_level = user.user_level + 1 if user.user_level + 1 in USER_LEVELS else None
+        next_level_points = USER_LEVELS[next_level]["points"] if next_level else None
+
+        return UserRankResponse(
+            max_user_id=max_user_id,
+            rank=rank,
+            total_users=total_users,
+            total_points=user.total_points,
+            user_level=user.user_level,
+            level_name=USER_LEVELS[user.user_level]["name"],
+            next_level=next_level,
+            next_level_name=USER_LEVELS[next_level]["name"] if next_level else None,
+            next_level_points=next_level_points,
+            points_to_next_level=(next_level_points - user.total_points) if next_level_points else None,
+        )
 
     async def update_user(self, user_uuid: UUID, update_data: UserUpdate) -> Optional[UserResponse]:
         """

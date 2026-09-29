@@ -1,5 +1,6 @@
 import logging
 from typing import Optional
+from maxapi.enums import TextFormat
 from maxapi.types import MessageCreated, MessageCallback, Attachment
 
 from backend.core.database import async_session_maker
@@ -83,4 +84,4 @@ async def start_handler(event: MessageCreated, bot):
 
 async def instruction_callback_handler(event: MessageCallback, payload: InstructionPayload):
     """Обработчик callback для показа инструкции"""
-    await event.message.answer(instruction_text)
+    await event.message.answer(instruction_text, format=TextFormat.MARKDOWN)

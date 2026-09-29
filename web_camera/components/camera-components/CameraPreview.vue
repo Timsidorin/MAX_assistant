@@ -1,9 +1,11 @@
 <template>
-  <video ref="videoElement" autoplay playsinline></video>
+  <video v-if="cameraAccess" ref="videoElement" autoplay playsinline></video>
+  <NoAccessCamera v-else/>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
+import NoAccessCamera from "../errors/NoAccessCamera.vue";
 
 const videoElement = ref(null);
 const mediaStream = ref(null);
@@ -25,12 +27,14 @@ const renderCamera = async () => {
     });
 
     mediaStream.value = stream;
+    cameraAccess.value = true;
 
     if (videoElement.value) {
       videoElement.value.srcObject = stream;
     }
 
   } catch (error) {
+    console.error('getUserMedia error:', error);
     cameraAccess.value = false;
   }
 }

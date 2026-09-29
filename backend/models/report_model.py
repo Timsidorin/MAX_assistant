@@ -60,6 +60,8 @@ class Report(Base):
     medium_count: Mapped[int] = mapped_column(Integer, default=0)
     low_count: Mapped[int] = mapped_column(Integer, default=0)
 
+    confirmations: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+
     status: Mapped[ReportStatus] = mapped_column(
         Enum(ReportStatus),
         default=ReportStatus.DRAFT,
@@ -101,8 +103,10 @@ class Report(Base):
 
     @property
     def auto_priority(self) -> ReportPriority:
-        if self.critical_count > 0 or self.max_risk > 70:
+        if self.critical_count > 0 or self.max_risk > 70 or self.confirmations >= 10:
             return ReportPriority.CRITICAL
+        if self.confirmations >= 5:
+            return ReportPriority.HIGH
         elif self.high_count > 0 or self.max_risk > 50:
             return ReportPriority.HIGH
         elif self.medium_count > 0 or self.max_risk > 30:

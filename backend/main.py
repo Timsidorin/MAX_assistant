@@ -16,7 +16,7 @@ from backend.models.report_model import ReportStatus, ReportPriority
 from backend.routers.cv_router import cv_router
 from backend.routers.reports_router import report_router
 from backend.routers.users_router import users_router
-from routers.tasks_router import tasks_router
+from backend.routers.tasks_router import tasks_router
 
 app = create_base_app(configs)
 

@@ -78,6 +78,7 @@ class ReportResponse(BaseModel):
     low_count: int
     status: str
     priority: str
+    confirmations: int = 0
     description: Optional[str]
     comment: Optional[str]
     created_at: datetime
@@ -109,6 +110,31 @@ class ReportListItem(BaseModel):
 class ReportListResponse(BaseModel):
     total: int
     items: List[ReportListItem]
+
+
+class ReportGeoPoint(BaseModel):
+    """Точка дефекта для карты"""
+    uuid: uuid.UUID
+    latitude: float
+    longitude: float
+    address: Optional[str] = None
+    status: str
+    priority: str
+    max_risk: float
+    total_potholes: int
+    confirmations: int = 0
+    created_at: datetime
+
+
+class ReportStatsResponse(BaseModel):
+    """Общая статистика для тикера на карте"""
+    total_reports: int
+    critical_count: int
+    high_count: int
+    total_potholes: int
+    worst_address: Optional[str] = None
+    worst_risk: float = 0.0
+    last_report_at: Optional[datetime] = None
 
 
 class ReportSubmitResponse(BaseModel):

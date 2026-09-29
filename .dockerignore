@@ -1,0 +1,14 @@
+.venv
+.git
+.idea
+node_modules
+dist
+__pycache__
+*.pyc
+logs
+.env
+mini_app/node_modules
+web_camera/node_modules
+mini_app/dist
+web_camera/dist
+hackathon_doc.txt

@@ -5,12 +5,41 @@ from typing import Optional, List, Annotated
 from uuid import UUID
 
 from backend.depends import UserServiceDep, AsyncSessionDep
-from backend.schemas.users_schema import UserResponse
+from backend.schemas.users_schema import UserResponse, LeaderboardResponse, UserRankResponse
 
 users_router = APIRouter(
     prefix="/api/users",
     tags=["Пользователи"]
 )
+
+
+@users_router.get(
+    "/leaderboard",
+    response_model=LeaderboardResponse,
+    summary="Рейтинг ямоборцев"
+)
+async def get_leaderboard(
+    limit: int = Query(10, ge=1, le=100, description="Количество позиций"),
+    user_service: UserServiceDep = None
+):
+    """Топ пользователей по очкам"""
+    return await user_service.get_leaderboard(limit)
+
+
+@users_router.get(
+    "/{max_user_id}/rank",
+    response_model=UserRankResponse,
+    summary="Ранг и прогресс уровня пользователя"
+)
+async def get_user_rank(
+    max_user_id: int = Path(..., gt=0, description="Внешний ID пользователя"),
+    user_service: UserServiceDep = None
+):
+    """Позиция в рейтинге и прогресс до следующего уровня"""
+    rank = await user_service.get_user_rank(max_user_id)
+    if not rank:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    return rank
 
 
 @users_router.get(

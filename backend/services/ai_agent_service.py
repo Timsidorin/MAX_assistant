@@ -1,267 +1,176 @@
 """
-AI Agent Service - интеллектуальный поиск email через Яндекс Алису.
+AI Agent Service - поиск контактов дорожных служб без браузера.
+
+Пайплайн:
+1. DaData: парсинг адреса -> город (suggest/address)
+2. DaData: поиск организации по городу (suggest/party) -> email/телефон/сайт
+3. GigaChat: fallback-генерация JSON с контактами ведомства
+4. Статичный fallback: портал "Решаем вместе" / Росавтодор
 """
 
-import re
-import os
-import time
 import json
-import random
-from typing import Optional, Dict
+import os
+import re
+import time
+from typing import Optional, Dict, List
+
+import httpx
 from dotenv import load_dotenv
-import undetected_chromedriver as uc
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, WebDriverException
 from loguru import logger
+
+from backend.services.external_services.gigachat_service import GigaChatService
 
 load_dotenv()
 
-SELENIUM_TIMEOUT = int(os.getenv('SELENIUM_TIMEOUT', '20'))
-ALISA_RESPONSE_TIMEOUT = int(os.getenv('ALISA_RESPONSE_TIMEOUT', '60'))
-REQUEST_DELAY_MIN = int(os.getenv('REQUEST_DELAY_MIN', '5'))
-REQUEST_DELAY_MAX = int(os.getenv('REQUEST_DELAY_MAX', '15'))
+DADATA_API_KEY = os.getenv("DADATA_API_KEY")
+DADATA_SUGGEST_URL = "https://suggestions.dadata.ru/suggestions/api/4_1/rs"
+REQUEST_TIMEOUT = 10
+CACHE_TTL = 24 * 60 * 60  # сутки
 
+EMAIL_PATTERN = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"
+PHONE_PATTERN = r"\+7\s?\(?\d{3}\)?\s?\d{3}[-\s]?\d{2}[-\s]?\d{2}"
 
-class ContentLoadedCondition:
-    """Кастомное условие: ждёт загрузки контента с email или достаточным количеством текста."""
-
-    def __init__(self, class_name: str, email_pattern: str, min_length: int = 100):
-        self.class_name = class_name
-        self.email_pattern = email_pattern
-        self.min_length = min_length
-
-    def __call__(self, driver):
-        try:
-            blocks = driver.find_elements(By.CLASS_NAME, self.class_name)
-            if not blocks:
-                return False
-
-            all_text = "\n".join([block.text for block in blocks if block.text])
-
-            has_email = re.search(self.email_pattern, all_text)
-            has_content = len(all_text) >= self.min_length
-
-            if has_email or has_content:
-                return all_text
-            return False
-        except Exception:
-            return False
+# Шаблоны поиска дорожной организации в DaData party
+PARTY_QUERIES = [
+    "управление дорожной деятельности {city}",
+    "управление дорог {city}",
+    "дорожное хозяйство {city}",
+    "комитет дорожного хозяйства {city}",
+    "администрация {city}",
+]
 
 
 class AIAgentService:
-    """Сервис для поиска контактов управлений дорожной деятельности через Алису."""
+    """Поиск контактов управления дорожной деятельности по адресу."""
 
     def __init__(self):
-        self.email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-        self.phone_pattern = r'\+7\s?\(?\d{3}\)?\s?\d{3}[-\s]?\d{2}[-\s]?\d{2}'
-        self.cache = {}
-        self.last_request_time = 0
+        self._gigachat: Optional[GigaChatService] = None
+        self._cache: Dict[str, dict] = {}  # city -> {ts, data}
 
-    def _setup_driver(self) -> uc.Chrome:
-        """Настройка undetected Chrome WebDriver для обхода капчи."""
-        options = uc.ChromeOptions()
+    @property
+    def gigachat(self) -> GigaChatService:
+        if self._gigachat is None:
+            self._gigachat = GigaChatService()
+        return self._gigachat
 
-        options.add_argument('--disable-blink-features=AutomationControlled')
-        options.add_argument('--disable-dev-shm-usage')
-        options.add_argument('--no-sandbox')
-        options.add_argument('--disable-gpu')
-        options.add_argument('--disable-extensions')
-        options.add_argument('disable-infobars')
-        options.add_argument(
-            '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
-
-        try:
-            driver = uc.Chrome(options=options, version_main=None)
-            driver.set_page_load_timeout(30)
-            return driver
-        except Exception as e:
-            logger.error(f"Chrome WebDriver initialization error: {e}")
-            raise
+    # ---------- Шаг 1: адрес -> город ----------
 
     def _extract_city(self, address: str) -> Optional[str]:
-        """Извлекает название города из адреса."""
-        match = re.search(r'г\s+([А-Яа-яЁё\s\-]+?)(?=\s*,|\s+край|\s+область|$)', address, re.IGNORECASE)
+        """Извлекает город из адреса через DaData, regex как fallback."""
+        if DADATA_API_KEY:
+            try:
+                resp = httpx.post(
+                    f"{DADATA_SUGGEST_URL}/suggest/address",
+                    headers={
+                        "Authorization": f"Token {DADATA_API_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    json={"query": address, "count": 1},
+                    timeout=REQUEST_TIMEOUT,
+                )
+                if resp.status_code == 200:
+                    suggestions = resp.json().get("suggestions") or []
+                    if suggestions:
+                        data = suggestions[0].get("data") or {}
+                        city = data.get("city") or data.get("settlement") or data.get("region")
+                        if city:
+                            logger.info(f"DaData resolved city: {city}")
+                            return city
+            except Exception as e:
+                logger.warning(f"DaData address suggest failed: {e}")
+
+        match = re.search(r"г\s+([А-Яа-яЁё\s\-]+?)(?=\s*,|\s+край|\s+область|$)", address, re.IGNORECASE)
         return match.group(1).strip() if match else None
 
-    def _build_search_query(self, city: str) -> str:
-        """Формирует оптимизированный поисковый запрос для Алисы."""
-        queries = [
-            f"email для обращений по дорогам в городе {city}",
-            f"контакты управления дорожной деятельности {city}",
-            f"куда писать о проблемах с дорогами в {city}",
-            f"email уддивб {city}",
-        ]
-        return queries[0]
+    # ---------- Шаг 2: DaData party ----------
 
-    def _wait_before_request(self):
-        """Добавляет случайную задержку между запросами для обхода блокировок."""
-        elapsed = time.time() - self.last_request_time
-        min_delay = REQUEST_DELAY_MIN
+    def _search_party_contacts(self, city: str) -> Optional[dict]:
+        """Ищет дорожную организацию через DaData party suggestions."""
+        if not DADATA_API_KEY:
+            return None
 
-        if elapsed < min_delay:
-            delay = random.uniform(min_delay - elapsed, REQUEST_DELAY_MAX)
-            logger.debug(f"Waiting {delay:.1f}s before request")
-            time.sleep(delay)
+        for template in PARTY_QUERIES:
+            try:
+                resp = httpx.post(
+                    f"{DADATA_SUGGEST_URL}/suggest/party",
+                    headers={
+                        "Authorization": f"Token {DADATA_API_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    json={"query": template.format(city=city), "count": 5},
+                    timeout=REQUEST_TIMEOUT,
+                )
+                if resp.status_code != 200:
+                    continue
 
-        self.last_request_time = time.time()
+                for sug in resp.json().get("suggestions") or []:
+                    data = sug.get("data") or {}
+                    # Берём только действующие госорганы/учреждения
+                    state = (data.get("state") or {}).get("status")
+                    if state and state not in ("ACTIVE",):
+                        continue
 
-    def _simulate_human_behavior(self, driver):
-        """Имитирует человеческое поведение для обхода антибот-систем."""
-        scroll_amount = random.randint(100, 500)
-        driver.execute_script(f"window.scrollBy(0, {scroll_amount});")
-        time.sleep(random.uniform(0.5, 1.5))
-        driver.execute_script("""
-            document.dispatchEvent(new MouseEvent('mousemove', {
-                bubbles: true,
-                clientX: Math.random() * window.innerWidth,
-                clientY: Math.random() * window.innerHeight
-            }));
-        """)
+                    emails = data.get("emails") or []
+                    phones = data.get("phones") or []
 
-    def _parse_alisa_answer(self, query: str) -> Dict[str, Optional[str]]:
-        """Парсит ответ Алисы и извлекает email и телефон."""
-        driver = None
-        result = {
-            'email': None,
-            'phone': None,
-            'organization': None
-        }
+                    result = {
+                        "organization": sug.get("value") or data.get("name", {}).get("full_with_opf"),
+                        "email": emails[0] if emails else None,
+                        "phone": phones[0] if phones else None,
+                        "website": None,
+                        "source": "dadata",
+                    }
+                    if result["organization"]:
+                        logger.info(f"DaData party: {result['organization']} (email={result['email']})")
+                        return result
+            except Exception as e:
+                logger.warning(f"DaData party suggest failed for '{template}': {e}")
+
+        return None
+
+    # ---------- Шаг 3: GigaChat ----------
+
+    def _search_gigachat(self, city: str, address: str) -> Optional[dict]:
+        """Просит GigaChat вернуть контакты дорожной службы в JSON."""
+        prompt = f"""Какая организация отвечает за состояние дорог в городе {city} (адрес обращения: {address})?
+
+Верни ТОЛЬКО валидный JSON без пояснений и markdown:
+{{"organization": "полное название ведомства", "email": "email для обращений или null", "phone": "телефон или null", "website": "сайт или null"}}
+
+Если email не знаешь точно — поставь null, НЕ выдумывай."""
 
         try:
-            self._wait_before_request()
+            client = self.gigachat._get_client()
+            from gigachat.models import Chat, Messages, MessagesRole
+            response = client.chat(
+                Chat(messages=[Messages(role=MessagesRole.USER, content=prompt)],
+                     temperature=0.2, max_tokens=300)
+            )
+            text = response.choices[0].message.content.strip()
+            match = re.search(r"\{.*\}", text, re.DOTALL)
+            if not match:
+                return None
 
-            logger.info(f"Starting browser for query: '{query}'")
-            driver = self._setup_driver()
+            data = json.loads(match.group(0))
+            email = data.get("email")
+            if email and not re.fullmatch(EMAIL_PATTERN, email):
+                email = None
 
-            search_url = f"https://ya.ru/search/?text={query}"
-            driver.get(search_url)
-
-            self._simulate_human_behavior(driver)
-
-            wait = WebDriverWait(driver, SELENIUM_TIMEOUT)
-
-            try:
-                close_button = wait.until(
-                    EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[aria-label="Нет, спасибо"]'))
-                )
-                time.sleep(random.uniform(0.5, 1.5))
-                close_button.click()
-            except (TimeoutException, NoSuchElementException):
-                pass
-
-            try:
-                wait.until(EC.invisibility_of_element_located((By.CLASS_NAME, "Distribution-SplashScreenModalScene")))
-            except TimeoutException:
-                pass
-
-            if "captcha" in driver.current_url.lower() or "showcaptcha" in driver.current_url.lower():
-                logger.warning("Captcha detected")
-                return result
-
-            try:
-                alisa_links = driver.find_elements(By.PARTIAL_LINK_TEXT, "алиса")
-                if not alisa_links:
-                    alisa_links = driver.find_elements(By.PARTIAL_LINK_TEXT, "Алиса")
-
-                if alisa_links:
-                    logger.info("Clicking on Alisa tab")
-                    time.sleep(random.uniform(1, 2))
-                    driver.execute_script("arguments[0].click();", alisa_links[0])
-
-                    extended_wait = WebDriverWait(driver, ALISA_RESPONSE_TIMEOUT)
-
-                    logger.info(f"Waiting up to {ALISA_RESPONSE_TIMEOUT}s for Alisa response")
-
-                    try:
-                        all_text = extended_wait.until(
-                            ContentLoadedCondition("FuturisMarkdown", self.email_pattern, 100)
-                        )
-
-                        if not all_text:
-                            logger.debug("Initial wait completed, checking content")
-                            max_retries = 10
-                            retry_count = 0
-
-                            while retry_count < max_retries:
-                                answer_blocks = driver.find_elements(By.CLASS_NAME, "FuturisMarkdown")
-                                all_text = "\n".join([block.text for block in answer_blocks if block.text])
-
-                                if re.search(self.email_pattern, all_text) or len(all_text) > 100:
-                                    logger.info(f"Content loaded successfully ({len(all_text)} chars)")
-                                    break
-
-                                logger.debug(f"Waiting for content, retry {retry_count + 1}/{max_retries}")
-                                time.sleep(2)
-                                retry_count += 1
-
-                            if retry_count >= max_retries:
-                                logger.warning("Max retries reached, content may be incomplete")
-                        else:
-                            logger.info(f"Content loaded successfully ({len(all_text)} chars)")
-
-                        answer_blocks = driver.find_elements(By.CLASS_NAME, "FuturisMarkdown")
-                        all_text = "\n".join([block.text for block in answer_blocks if block.text])
-
-                        if len(all_text) == 0:
-                            logger.warning("No text content found in answer blocks")
-                            return result
-
-                        logger.debug(f"Total text length: {len(all_text)}")
-
-                        emails = re.findall(self.email_pattern, all_text)
-                        unique_emails = list(set(emails))
-
-                        phones = re.findall(self.phone_pattern, all_text)
-                        unique_phones = list(set(phones))
-
-                        org_patterns = [
-                            r'(Управление дорожной деятельности[^.]*)',
-                            r'(УДД[^.]*)',
-                            r'(Администрация[^.]*)',
-                        ]
-                        for pattern in org_patterns:
-                            org_match = re.search(pattern, all_text)
-                            if org_match:
-                                result['organization'] = org_match.group(1).strip()
-                                break
-
-                        if unique_emails:
-                            result['email'] = unique_emails[0]
-                            logger.info(f"Found email: {result['email']}")
-
-                        if unique_phones:
-                            result['phone'] = unique_phones[0]
-                            logger.info(f"Found phone: {result['phone']}")
-
-                        if not unique_emails and not unique_phones:
-                            logger.warning("No contacts found in response")
-
-                    except TimeoutException:
-                        logger.error(f"Timeout: Alisa took longer than {ALISA_RESPONSE_TIMEOUT}s to respond")
-
-                else:
-                    logger.warning("Alisa tab not found")
-
-            except Exception as e:
-                logger.error(f"Error parsing Alisa: {e}")
-
+            return {
+                "organization": data.get("organization"),
+                "email": email,
+                "phone": data.get("phone"),
+                "website": data.get("website"),
+                "source": "gigachat",
+            }
         except Exception as e:
-            logger.error(f"Browser error: {e}")
+            logger.warning(f"GigaChat contact search failed: {e}")
+            return None
 
-        finally:
-            if driver:
-                driver.quit()
-
-        return result
+    # ---------- Основная функция ----------
 
     def find_road_agency_contacts(self, address: str, coordinates: Optional[dict] = None) -> dict:
-        """
-        Главная функция поиска контактов управления дорожной деятельности.
-        С кешированием для избежания повторных запросов.
-        """
-
+        """Находит контакты дорожной службы: DaData -> GigaChat -> fallback."""
         city = self._extract_city(address)
 
         if not city:
@@ -272,47 +181,54 @@ class AIAgentService:
                 "email": "rad@rosavtodor.gov.ru",
                 "website": "https://rosavtodor.gov.ru",
                 "phone": None,
-                "status": "city_not_found"
+                "status": "city_not_found",
             }
 
-        if city in self.cache:
-            logger.info(f"Using cached data for {city}")
-            cached = self.cache[city]
-            return {
-                "success": cached['email'] is not None,
-                "city": city,
-                "organization": cached.get('organization') or f"Управление дорожной деятельности {city}",
-                "email": cached['email'],
-                "website": None,
-                "phone": cached.get('phone'),
-                "status": "cached"
-            }
+        # Кэш по городу
+        cached = self._cache.get(city)
+        if cached and time.time() - cached["ts"] < CACHE_TTL:
+            logger.info(f"Contacts for {city} from cache")
+            result = dict(cached["data"])
+            result["status"] = "cached"
+            return result
 
-        query = self._build_search_query(city)
+        # DaData party
+        result = self._search_party_contacts(city)
 
-        alisa_result = self._parse_alisa_answer(query)
-        self.cache[city] = alisa_result
+        # GigaChat fallback / дополнение email
+        if not result or not result.get("email"):
+            giga = self._search_gigachat(city, address)
+            if giga:
+                if result:
+                    result["email"] = result["email"] or giga.get("email")
+                    result["phone"] = result["phone"] or giga.get("phone")
+                    result["website"] = result["website"] or giga.get("website")
+                else:
+                    result = giga
 
-        if alisa_result['email']:
-            return {
+        if result and result.get("email"):
+            data = {
                 "success": True,
                 "city": city,
-                "organization": alisa_result.get('organization') or f"Управление дорожной деятельности {city}",
-                "email": alisa_result['email'],
-                "website": None,
-                "phone": alisa_result.get('phone'),
-                "status": "found"
+                "organization": result.get("organization") or f"Управление дорожной деятельности {city}",
+                "email": result["email"],
+                "website": result.get("website"),
+                "phone": result.get("phone"),
+                "status": "found",
             }
-        else:
-            return {
-                "success": False,
-                "city": city,
-                "organization": f"Администрация {city}",
-                "email": None,
-                "website": None,
-                "phone": alisa_result.get('phone'),
-                "status": "email_not_found"
-            }
+            self._cache[city] = {"ts": time.time(), "data": data}
+            return data
+
+        # Финальный fallback: федеральный портал для дорожных обращений
+        return {
+            "success": False,
+            "city": city,
+            "organization": (result or {}).get("organization") or f"Администрация {city}",
+            "email": (result or {}).get("email"),
+            "website": "https://pos.gosuslugi.ru",
+            "phone": (result or {}).get("phone"),
+            "status": "email_not_found",
+        }
 
 
 _service_instance = None
@@ -327,12 +243,5 @@ def find_road_agency_contacts(address: str, coordinates: Optional[dict] = None) 
 
 
 if __name__ == "__main__":
-    test_addresses = {
-        "Vladivostok": "Приморский край, г Владивосток, ул Светланская, 1",
-    }
-    for city_name, address in test_addresses.items():
-        print(f"\n{'=' * 60}")
-        print(f"Testing: {city_name}")
-        print(f"{'=' * 60}")
-        result = find_road_agency_contacts(address)
-        print(json.dumps(result, ensure_ascii=False, indent=2))
+    result = find_road_agency_contacts("Приморский край, г Владивосток, ул Светланская, 1")
+    print(json.dumps(result, ensure_ascii=False, indent=2))

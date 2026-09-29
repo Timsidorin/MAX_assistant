@@ -2,7 +2,7 @@
 from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 from uuid import UUID
-from typing import Optional
+from typing import Optional, List
 
 
 class UserCreate(BaseModel):
@@ -40,3 +40,35 @@ class UserResponse(BaseModel):
     total_points: int = Field(default=0, ge=0)
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class LeaderboardItem(BaseModel):
+    """Позиция в рейтинге ямоборцев"""
+    rank: int
+    max_user_id: int
+    first_name: str
+    last_name: str
+    user_level: int
+    current_status: Optional[str] = None
+    total_points: int
+    sent_reports_count: int
+
+
+class LeaderboardResponse(BaseModel):
+    """Рейтинг пользователей"""
+    total_users: int
+    items: List[LeaderboardItem]
+
+
+class UserRankResponse(BaseModel):
+    """Ранг и прогресс уровня пользователя"""
+    max_user_id: int
+    rank: int
+    total_users: int
+    total_points: int
+    user_level: int
+    level_name: str
+    next_level: Optional[int] = None
+    next_level_name: Optional[str] = None
+    next_level_points: Optional[int] = None
+    points_to_next_level: Optional[int] = None

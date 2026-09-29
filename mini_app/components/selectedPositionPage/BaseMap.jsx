@@ -15,13 +15,15 @@ export function BaseMap() {
     const [isMapLoaded, setIsMapLoaded] = useState(false);
 
     useEffect(() => {
-        mmrgl.accessToken = import.meta.env.VITE_VK_MAP_API;
+        mmrgl.accessToken = import.meta.env.VITE_VK_MAP_API || '';
 
         map.current = new mmrgl.Map({
             container: 'map',
             zoom: 8,
             center: selectedPosition,
-            style: 'mmr://api/styles/main_style.json',
+            style: import.meta.env.VITE_VK_MAP_API
+                ? 'mmr://api/styles/main_style.json'
+                : 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
             hash: true,
         });
 
