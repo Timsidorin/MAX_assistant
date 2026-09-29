@@ -22,6 +22,8 @@ from backend.services.ai_agent_service import find_road_agency_contacts
 from backend.services.users_service import UserService
 from backend.services.external_services.email_service import EmailService
 from backend.services.external_services.gigachat_service import GigaChatService
+from backend.services.external_services.geo_service import GeocodingService
+from backend.services.external_services.local_storage_service import LocalStorageService
 from backend.services.document_service import DocumentService
 from backend.services.notification_service import notify_user
 from backend.schemas.users_schema import UserUpdate
@@ -61,10 +63,26 @@ class ReportService:
 
     async def create_draft(self, data: ReportCreateDraft) -> ReportDraftCreatedResponse:
         """Создать черновик заявки"""
+        latitude = data.latitude
+        longitude = data.longitude
+        try:
+            coordinates_missing = not latitude or not longitude or (
+                float(latitude) == 0 and float(longitude) == 0
+            )
+        except (TypeError, ValueError):
+            coordinates_missing = True
+
+        if coordinates_missing:
+            resolved_coordinates = await GeocodingService().geocode_address(data.address) if data.address else None
+            if resolved_coordinates:
+                latitude, longitude = resolved_coordinates
+            else:
+                latitude, longitude = None, None
+
         report = Report()
         report.user_id = data.user_id
-        report.latitude = data.latitude
-        report.longitude = data.longitude
+        report.latitude = latitude
+        report.longitude = longitude
         report.address = data.address
         report.description = data.description
         report.status = ReportStatus.DRAFT
@@ -89,8 +107,6 @@ class ReportService:
 
         can_submit = bool(
             report.status == ReportStatus.DRAFT and
-            report.latitude and
-            report.longitude and
             report.address and
             (report.image_url or report.image_urls or report.video_url)
         )
@@ -172,7 +188,8 @@ class ReportService:
             logger.warning(f"Report {report_uuid} not found for submission")
             raise HTTPException(status_code=404, detail="Заявка не найдена")
 
-        if report.status != ReportStatus.DRAFT:
+        is_retry = report.status == ReportStatus.SUBMITTED and report.ai_agent_status == "failed"
+        if report.status != ReportStatus.DRAFT and not is_retry:
             logger.warning(f"Report {report_uuid} already submitted with status {report.status.value}")
             raise HTTPException(
                 status_code=400,
@@ -188,9 +205,10 @@ class ReportService:
             )
 
         report.status = ReportStatus.SUBMITTED
-        report.submitted_at = datetime.now()
+        if not is_retry:
+            report.submitted_at = datetime.now()
 
-        if report.user_id:
+        if report.user_id and not is_retry:
             try:
                 user_service = UserService(self.db)
                 points_awarded = {
@@ -268,16 +286,16 @@ class ReportService:
             logger.info(f"[Task {task_id}] Finding contacts for address: {report.address}")
             contacts_result = find_road_agency_contacts(report.address)
 
-            if not contacts_result.get('success') or not contacts_result.get('email'):
-                report.ai_agent_status = "failed"
-                report.comment = "Не удалось найти email для обращения"
-                await repository.update(report)
-                logger.error(f"[Task {task_id}] Failed to find contacts")
-                return
-
-            organization_name = contacts_result.get('organization', 'Управление дорожной деятельности')
+            organization_name = contacts_result.get('organization') or 'Управление дорожной деятельности'
+            contact_email = contacts_result.get('email')
             email_to = "timofeisidorin@vk.com"  # For testing
-            # email_to = contacts_result.get('email')  # Production
+            # email_to = contact_email  # Production
+
+            if not contact_email:
+                logger.warning(
+                    f"[Task {task_id}] Organization resolved without email; "
+                    f"using test recipient, status={contacts_result.get('status')}"
+                )
 
             report.organization_name = organization_name
             await repository.update(report)
@@ -375,6 +393,12 @@ class ReportService:
                     report.ai_agent_status = "failed"
                     report.comment = f"Ошибка: {str(e)}"
                     await repository.update(report)
+                    if report.user_id:
+                        await notify_user(
+                            report.user_id,
+                            f"Не удалось завершить обработку заявки по адресу «{report.address}». "
+                            f"Заявка сохранена, повторите отправку позже."
+                        )
             except Exception as update_error:
                 logger.error(f"[Task {task_id}] Failed to update report status: {update_error}", exc_info=True)
 
@@ -393,21 +417,26 @@ class ReportService:
             photo_urls.extend(report.image_urls)
 
         logger.info(f"Found {len(photo_urls)} photo URLs to download")
+        local_storage = LocalStorageService()
 
         async with aiohttp.ClientSession() as session:
             for idx, url in enumerate(photo_urls, 1):
                 try:
-                    logger.debug(f"Downloading photo {idx}/{len(photo_urls)}: {url[:50]}...")
-                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response:
-                        response.raise_for_status()
-                        content = await response.read()
-                        parsed_url = urlparse(url)
-                        file_ext = Path(parsed_url.path).suffix or '.jpg'
-                        filename = f"photo_{idx}{file_ext}"
-                        photo_attachments.append((filename, content))
-                        logger.debug(f"Downloaded: {filename} ({len(content)} bytes)")
+                    parsed_url = urlparse(url)
+                    file_ext = Path(parsed_url.path).suffix or '.jpg'
+                    filename = f"photo_{idx}{file_ext}"
+                    content = await local_storage.read_file(url)
+
+                    if content is None:
+                        logger.debug(f"Downloading external photo {idx}/{len(photo_urls)}: {url[:50]}...")
+                        async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response:
+                            response.raise_for_status()
+                            content = await response.read()
+
+                    photo_attachments.append((filename, content))
+                    logger.debug(f"Attached: {filename} ({len(content)} bytes)")
                 except Exception as e:
-                    logger.warning(f"Failed to download photo {idx} from {url[:50]}: {e}")
+                    logger.warning(f"Failed to load photo {idx} from {url[:50]}: {e}")
                     continue
 
         logger.info(f"Successfully downloaded {len(photo_attachments)}/{len(photo_urls)} photos")

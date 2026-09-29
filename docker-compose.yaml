@@ -33,6 +33,8 @@ services:
         condition: service_healthy
     ports:
       - "8005:8005"
+    volumes:
+      - media_data:/app/backend/media
 
   web_camera:
     build:
@@ -50,3 +52,4 @@ services:
 
 volumes:
   pgdata:
+  media_data:

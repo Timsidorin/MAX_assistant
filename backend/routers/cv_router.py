@@ -1,7 +1,7 @@
 # backend/routers/cv_router.py
 
 from functools import lru_cache
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from typing import Annotated
 import base64
 from datetime import datetime
@@ -27,9 +27,18 @@ def get_pothole_detection_service():
 PotholeServiceDep = Annotated[PotholeDetectionService, Depends(get_pothole_detection_service)]
 
 
+def get_public_base_url(request: Request) -> str:
+    forwarded_protocol = request.headers.get("x-forwarded-proto")
+    forwarded_host = request.headers.get("x-forwarded-host")
+    protocol = forwarded_protocol.split(",")[0].strip() if forwarded_protocol else request.url.scheme
+    host = forwarded_host.split(",")[0].strip() if forwarded_host else request.headers.get("host")
+    return f"{protocol}://{host}"
+
+
 @cv_router.post("/image", summary="Обработка одного изображения", response_model=DetectionResponse)
 async def detect_single_image(
     payload: ImageBase64Input,
+    request: Request,
     db: AsyncSessionDep,
     service: PotholeServiceDep
 ):
@@ -63,7 +72,8 @@ async def detect_single_image(
             image_bytes=image_bytes,
             input_data=payload,
             filename=filename,
-            db=db
+            db=db,
+            public_base_url=get_public_base_url(request)
         )
 
         return result
@@ -80,6 +90,7 @@ async def detect_single_image(
 @cv_router.post("/images", summary="Обработка нескольких изображений", response_model=MultipleDetectionResponse)
 async def detect_multiple_images(
     payload: MultipleImagesBase64Input,
+    request: Request,
     db: AsyncSessionDep,
     service: PotholeServiceDep
 ):
@@ -116,7 +127,8 @@ async def detect_multiple_images(
         result = await service.process_multiple_images_bytes(
             images_data=decoded_images,
             input_data=payload,
-            db=db
+            db=db,
+            public_base_url=get_public_base_url(request)
         )
 
         return result
@@ -130,6 +142,7 @@ async def detect_multiple_images(
 @cv_router.post("/video", summary="Обработка видео", response_model=VideoDetectionResponse)
 async def detect_video(
     payload: VideoBase64Input,
+    request: Request,
     db: AsyncSessionDep,
     service: PotholeServiceDep
 ):
@@ -163,7 +176,8 @@ async def detect_video(
             video_bytes=video_bytes,
             input_data=payload,
             filename=filename,
-            db=db
+            db=db,
+            public_base_url=get_public_base_url(request)
         )
 
         return result

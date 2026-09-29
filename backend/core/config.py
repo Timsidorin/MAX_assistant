@@ -31,26 +31,11 @@ class Configs(BaseSettings):
     DB_PASS: Optional[str] = Field(default="admin", env="DB_PASS")
 
     # ------------ Почта (оповещение) ------------
-    MAILRU_SMTP_HOST: Optional[str] = Field(default="smtp.mail.ru", env="MAILRU_SMTP_HOST")
-    MAILRU_SMTP_PORT: Optional[int] = Field(default=465, env="MAILRU_SMTP_PORT")
-    MAILRU_SMTP_USER: Optional[str] = Field(default="MAILRU_SMTP_USER", env="MAILRU_SMTP_USER")
-    MAILRU_SMTP_PASSWORD: Optional[str] = Field(default="MAILRU_SMTP_PASSWORD", env="MAILRU_SMTP_PASSWORD")
-
-
-
-    AWS_ACCESS_KEY_ID: Optional[str] = Field(
-        default="AWS_ACCESS_KEY_ID", env="AWS_ACCESS_KEY_ID"
-    )
-    AWS_SECRET_ACCESS_KEY: Optional[str] = Field(
-        default="AWS_SECRET_ACCESS_KEY", env="AWS_SECRET_ACCESS_KEY"
-    )
-    S3_BUCKET_NAME: Optional[str] = Field(
-        default="S3_BUCKET_NAME", env="S3_BUCKET_NAME"
-    )
-    S3_ENDPOINT_URL: Optional[str] = Field(
-        default="https://hb.ru-msk.S3_ENDPOINT_URL-storage.ru/", env="S3_ENDPOINT_URL"
-    )
-    S3_REGION_NAME: Optional[str] = Field(default="ru-msk", env="S3_REGION_NAME")
+    YANDEX_SMTP_HOST: str = Field(default="smtp.yandex.ru", env="YANDEX_SMTP_HOST")
+    YANDEX_SMTP_PORT: int = Field(default=465, env="YANDEX_SMTP_PORT")
+    YANDEX_SMTP_USER: str = Field(default="", env="YANDEX_SMTP_USER")
+    YANDEX_SMTP_PASSWORD: str = Field(default="", env="YANDEX_SMTP_PASSWORD")
+    EMAIL_FROM_NAME: str = Field(default="Ямоборец", env="EMAIL_FROM_NAME")
 
 
     model_config = SettingsConfigDict(

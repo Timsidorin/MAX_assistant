@@ -3,9 +3,9 @@ import logging
 import os
 from dotenv import load_dotenv
 from maxapi import Bot, Dispatcher
-from maxapi.types import CommandStart, MessageCreated, MessageCallback
+from maxapi.types import BotStarted, CommandStart, MessageCreated, MessageCallback
 
-from max_bot.handlers import start_handler, instruction_callback_handler
+from max_bot.handlers import bot_started_handler, start_handler, instruction_callback_handler
 from max_bot.keyboards import InstructionPayload
 
 
@@ -18,6 +18,11 @@ WEBAPP_URL = os.getenv("WEBAPP_URL")
 
 bot = Bot(TOKEN)
 dp = Dispatcher()
+
+
+@dp.bot_started()
+async def handle_bot_started(event: BotStarted):
+    await bot_started_handler(event, bot)
 
 
 @dp.message_created(CommandStart())

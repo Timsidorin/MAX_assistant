@@ -6,6 +6,7 @@ dist
 __pycache__
 *.pyc
 logs
+backend/media
 .env
 mini_app/node_modules
 web_camera/node_modules

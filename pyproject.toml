@@ -5,14 +5,10 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "aioboto3==15.5.0",
-    "aiobotocore==2.25.1",
     "aiofiles==24.1.0",
     "aiohttp==3.13.2",
     "alembic==1.17.1",
     "asyncpg==0.30.0",
-    "boto3==1.40.61",
-    "botocore==1.40.61",
     "certifi==2025.10.5",
     "coloredlogs==15.0.1",
     "docx2pdf==0.1.8",
@@ -36,7 +32,6 @@ dependencies = [
     "python-dotenv==1.2.1",
     "pywin32==311",
     "requests==2.32.5",
-    "s3transfer==0.14.0",
     "scipy==1.15.3",
     "sqlalchemy==2.0.44",
     "starlette==0.49.3",
@@ -45,4 +40,5 @@ dependencies = [
     "ultralytics==8.3.227",
     "uuid>=1.30",
     "uvicorn==0.38.0",
+    "websockets==15.0.1",
 ]

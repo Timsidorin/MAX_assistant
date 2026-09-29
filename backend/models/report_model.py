@@ -95,21 +95,22 @@ class Report(Base):
     def can_be_submitted(self) -> bool:
         return (
             self.status == ReportStatus.DRAFT and
-            self.latitude and
-            self.longitude and
             self.address and
             (self.image_url or self.image_urls or self.video_url)
         )
 
     @property
     def auto_priority(self) -> ReportPriority:
-        if self.critical_count > 0 or self.max_risk > 70 or self.confirmations >= 10:
+        critical_count = self.critical_count or 0
+        high_count = self.high_count or 0
+        medium_count = self.medium_count or 0
+        max_risk = self.max_risk or 0.0
+        confirmations = self.confirmations or 0
+
+        if critical_count > 0 or max_risk > 70 or confirmations >= 10:
             return ReportPriority.CRITICAL
-        if self.confirmations >= 5:
+        if confirmations >= 5 or high_count > 0 or max_risk > 50:
             return ReportPriority.HIGH
-        elif self.high_count > 0 or self.max_risk > 50:
-            return ReportPriority.HIGH
-        elif self.medium_count > 0 or self.max_risk > 30:
+        if medium_count > 0 or max_risk > 30:
             return ReportPriority.MEDIUM
-        else:
-            return ReportPriority.LOW
+        return ReportPriority.LOW

@@ -10,12 +10,8 @@ export async function getTicket(params = {}) {
     }
 }
 
-export async function postTicket(uuid) {
-    try {
-        return await axios.post(__BASE__PYTHON__URL__ + `/api/reports/submit/${uuid}`);
-    } catch (error) {
-        console.error(error);
-    }
+export function postTicket(uuid) {
+    return axios.post(__BASE__PYTHON__URL__ + `/api/reports/submit/${uuid}`);
 }
 
 export async function sendReport(data) {

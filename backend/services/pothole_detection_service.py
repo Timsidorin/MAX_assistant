@@ -7,25 +7,29 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import List, Tuple, Dict
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException
+from loguru import logger
 import tempfile
 import os
+from pathlib import Path
 
 from backend.schemas.cv_schema import (
     InputValues, DetectionResponse, MultipleDetectionResponse,
     VideoDetectionResponse, SeverityStats, SingleImageResult
 )
 from backend.services.external_services.geo_service import GeocodingService
-from backend.services.external_services.s3_service import S3Service
+from backend.services.external_services.local_storage_service import LocalStorageService
 
 
 class PotholeDetectionService:
     """Сервис для детекции ям на дорожном покрытии с YOLO11"""
 
-    def __init__(self, model_path: str = './cv_models/best.pt', max_workers: int = 4):
-        self.model_path = model_path
+    def __init__(self, model_path: str | os.PathLike | None = None, max_workers: int = 4):
+        self.model_path = str(
+            Path(model_path) if model_path else Path(__file__).resolve().parents[1] / 'cv_models' / 'best.pt'
+        )
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
         self.model = self._load_model()
-        self.s3_service = S3Service()
+        self.storage_service = LocalStorageService()
         self.geocoding_service = GeocodingService()
 
         self.conf_threshold = 0.15
@@ -182,18 +186,20 @@ class PotholeDetectionService:
             image_bytes: bytes,
             input_data: InputValues,
             filename: str,
-            db: AsyncSession
+            db: AsyncSession,
+            public_base_url: str = ""
     ) -> DetectionResponse:
         """Обработка одного изображения"""
         try:
             result_bytes, stats, risks = await asyncio.get_event_loop().run_in_executor(
                 self.executor, self._process_image_sync, image_bytes
             )
-            image_url = await self.s3_service.upload_file(
+            image_url = await self.storage_service.upload_file(
                 file_bytes=result_bytes,
                 folder="processed/images",
                 filename=filename,
-                content_type="image/jpeg"
+                content_type="image/jpeg",
+                base_url=public_base_url
             )
             address = await self.geocoding_service.geocode_coordinates(
                 latitude=input_data.latitude,
@@ -219,9 +225,10 @@ class PotholeDetectionService:
             self,
             images_data: List[Tuple[bytes, str]],
             input_data,
-            db: AsyncSession
+            db: AsyncSession,
+            public_base_url: str = ""
     ) -> MultipleDetectionResponse:
-        """Обработка нескольких изображений из base64 с загрузкой в S3"""
+        """Обработка нескольких изображений из base64 с сохранением локально"""
         results = []
         successful = 0
         failed = 0
@@ -229,7 +236,7 @@ class PotholeDetectionService:
         tasks = []
         for idx, (image_bytes, filename) in enumerate(images_data):
             task = self._process_single_image_task(
-                image_bytes, filename, idx, input_data
+                image_bytes, filename, idx, input_data, public_base_url
             )
             tasks.append(task)
 
@@ -254,6 +261,14 @@ class PotholeDetectionService:
                 else:
                     failed += 1
 
+        if successful == 0:
+            errors = [result.error for result in results if result.error]
+            logger.error("Не удалось обработать изображения: {}", errors)
+            raise HTTPException(
+                status_code=500,
+                detail="Не удалось обработать изображения. Проверьте CV-модель и подключение к хранилищу."
+            )
+
         address = await self.geocoding_service.geocode_coordinates(
             latitude=input_data.latitude,
             longitude=input_data.longitude
@@ -275,7 +290,8 @@ class PotholeDetectionService:
             image_bytes: bytes,
             filename: str,
             idx: int,
-            input_data
+            input_data,
+            public_base_url: str = ""
     ) -> SingleImageResult:
         """Задача для обработки одного изображения"""
         try:
@@ -283,11 +299,12 @@ class PotholeDetectionService:
                 self.executor, self._process_image_sync, image_bytes
             )
 
-            image_url = await self.s3_service.upload_file(
+            image_url = await self.storage_service.upload_file(
                 file_bytes=result_bytes,
                 folder="processed/images",
                 filename=filename,
-                content_type="image/jpeg"
+                content_type="image/jpeg",
+                base_url=public_base_url
             )
 
             return SingleImageResult(
@@ -300,6 +317,7 @@ class PotholeDetectionService:
                 image_url=image_url
             )
         except Exception as e:
+            logger.exception("Ошибка обработки изображения {}", filename)
             return SingleImageResult(
                 filename=filename,
                 index=idx,
@@ -315,9 +333,10 @@ class PotholeDetectionService:
             video_bytes: bytes,
             input_data,
             filename: str,
-            db: AsyncSession
+            db: AsyncSession,
+            public_base_url: str = ""
     ) -> VideoDetectionResponse:
-        """Обработка видео из base64 с загрузкой в S3"""
+        """Обработка видео из base64 с сохранением локально"""
         if self.model is None:
             raise HTTPException(status_code=500, detail="YOLO11 модель не загружена")
 
@@ -381,11 +400,12 @@ class PotholeDetectionService:
             with open(temp_output.name, 'rb') as video_file:
                 processed_video_bytes = video_file.read()
 
-            video_url = await self.s3_service.upload_file(
+            video_url = await self.storage_service.upload_file(
                 file_bytes=processed_video_bytes,
                 folder="processed/videos",
                 filename=filename,
-                content_type="video/mp4"
+                content_type="video/mp4",
+                base_url=public_base_url
             )
 
             address = await self.geocoding_service.geocode_coordinates(

@@ -25,8 +25,9 @@ export function ListStepsContainer() {
             const response = await postTicket(params.uuid);
             const pointsMap = {low: 10, medium: 20, high: 50, critical: 100};
             const points = pointsMap[response?.data?.priority] || 10;
+            setStatus(false);
             toast.success(`🎉 Заявка принята! +${points} очков ямоборца`, {duration: 4000});
-            setTimeout(() => navigate('/profile'), 1200);
+            setTimeout(() => navigate('/profile', {replace: true}), 500);
         } catch (error) {
             console.error(error);
             toast.error('Не удалось отправить заявку');
@@ -73,10 +74,10 @@ function ListStepsView(props) {
                 })
                 }
             </Flex>
-            <Button style={{marginTop: '24px'}} stretched onClick={() => {
+            <Button disabled={props.status} style={{marginTop: '24px'}} stretched onClick={() => {
                 props.click();
             }}>
-                Отправить заявление
+                {props.status ? 'Отправляем…' : 'Отправить заявление'}
             </Button>
             {
                 props.status && <PlugLoader />

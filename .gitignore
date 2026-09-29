@@ -208,4 +208,5 @@ __marimo__/
 
 .idea
 web_camera/node_modules
+backend/media/
 mini_app/node_modules

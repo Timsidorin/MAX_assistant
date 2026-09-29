@@ -4,11 +4,13 @@ from loguru import logger
 from typing import AsyncGenerator
 from contextlib import asynccontextmanager
 from starlette.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 import asyncio
 import os
 import sys
 
 from max_bot.main import dp, bot
+from backend.services.external_services.local_storage_service import MEDIA_ROOT, MEDIA_URL_PREFIX
 
 logger.remove()
 logger.add(
@@ -68,6 +70,9 @@ def create_base_app(configs):
         title=configs.PROJECT_NAME,
         lifespan=lifespan,
     )
+
+    MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+    app.mount(MEDIA_URL_PREFIX, StaticFiles(directory=MEDIA_ROOT), name="media")
 
     app.add_middleware(
         CORSMiddleware,
