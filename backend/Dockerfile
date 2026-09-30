@@ -5,7 +5,9 @@ WORKDIR /app
 RUN pip install --no-cache-dir uv
 
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev --no-install-project
+RUN uv sync --frozen --no-dev --no-install-project --no-install-package torch --no-install-package torchvision
+RUN uv pip install torch==2.9.0 torchvision==0.24.0 --index-url https://download.pytorch.org/whl/cpu
+RUN uv cache clean
 
 COPY backend ./backend
 COPY max_bot ./max_bot
