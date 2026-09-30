@@ -116,8 +116,8 @@ class Report(Base):
     def can_be_submitted(self) -> bool:
         return (
             self.status == ReportStatus.DRAFT and
-            self.address and
-            (self.image_url or self.image_urls or self.video_url)
+            bool(self.address) and
+            bool(self.image_url or self.image_urls or self.video_url)
         )
 
     @property
