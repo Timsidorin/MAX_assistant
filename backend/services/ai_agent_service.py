@@ -301,15 +301,12 @@ Email указывай только вместе с официальной ст�
             result["status"] = "cached"
             return result
 
-        # 1. DaData party
         dadata_result = self._search_party_contacts(city, region)
 
-        # 2. GigaChat: поиск организации + email
         giga = None
         if not dadata_result or not dadata_result.get("email"):
             giga = self._search_gigachat_contacts(city, region, address)
 
-        # 3. Слияние результатов
         organization = None
         email = None
         phone = None
@@ -332,7 +329,6 @@ Email указывай только вместе с официальной ст�
             website = website or giga.get("website")
             source = "dadata+gigachat" if dadata_result else "gigachat"
 
-        # 4. Если организация есть, но email нет — попробуем найти официальный канал по названию
         channel_type = giga.get("channel_type") if giga else None
         authority_level = giga.get("authority_level") if giga else "unknown"
         source_url = giga.get("source_url") if giga else None

@@ -1,5 +1,4 @@
 <template>
-<!--  <a href="https://max.ru/t86_hakaton_bot?startapp">Открыть миниаппу</a>-->
   <WebCamera/>
 </template>
 

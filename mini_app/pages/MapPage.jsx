@@ -13,7 +13,6 @@ const PRIORITY_COLORS = {
     low: '#34C759',
 };
 
-// Бесплатный векторный стиль без токена; mmr-стиль — если задан VITE_VK_MAP_API
 const FALLBACK_STYLE = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
 
 function getMapStyle() {
@@ -60,7 +59,7 @@ export function MapPage() {
     const mapContainer = useRef(null);
     const map = useRef(null);
     const [isMapLoaded, setIsMapLoaded] = useState(false);
-    const [mode, setMode] = useState('points'); // 'points' | 'heat'
+    const [mode, setMode] = useState('points');
     const [count, setCount] = useState(0);
     const [stats, setStats] = useState(null);
 
@@ -93,7 +92,6 @@ export function MapPage() {
                 clusterRadius: 50,
             });
 
-            // Кластеры — круги, цвет и размер по количеству заявок
             map.current.addLayer({
                 id: 'reports-clusters',
                 type: 'circle',
@@ -120,7 +118,6 @@ export function MapPage() {
                 paint: { 'text-color': '#ffffff' },
             });
 
-            // Одиночные точки — цвет по приоритету, радиус по риску
             map.current.addLayer({
                 id: 'reports-points',
                 type: 'circle',
@@ -157,7 +154,6 @@ export function MapPage() {
                 },
             });
 
-            // Клик по кластеру — зум до раскрытия
             map.current.on('click', 'reports-clusters', async (e) => {
                 const clusterId = e.features[0].properties.cluster_id;
                 const coords = e.features[0].geometry.coordinates.slice();
@@ -218,7 +214,6 @@ export function MapPage() {
             map.current.addControl(new mmrgl.NavigationControl({ showCompass: false }), 'top-right');
             map.current.addControl(new mmrgl.FullscreenControl(), 'top-right');
 
-            // Пульсирующий маркер на самой свежей заявке
             if (points.length > 0) {
                 const newest = points[0];
                 const pulseEl = document.createElement('div');

@@ -17,7 +17,6 @@ export default defineConfig({
         __BASE__PYTHON__URL__: JSON.stringify('https://excellently-sterling-roundworm.cloudpub.ru'),
         __BASE__SCANNER__URL__: JSON.stringify('https://permissibly-still-badger.cloudpub.ru'),
     },
-    //для разработки внутри мини аппы
     server: {
         allowedHosts: ['ravenously-mutual-iguana.cloudpub.ru', 'pulseai.knastu.ru', 'avowedly-oriented-dodo.cloudpub.ru'],
         port: 8008,

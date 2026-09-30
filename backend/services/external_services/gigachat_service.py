@@ -1,5 +1,3 @@
-# backend/services/gigachat_service.py
-
 import os
 import time
 from typing import Optional

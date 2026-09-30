@@ -1,5 +1,3 @@
-# backend/routers/cv_router.py
-
 from functools import lru_cache
 from fastapi import APIRouter, Depends, HTTPException, Request
 from typing import Annotated
@@ -23,7 +21,6 @@ def get_pothole_detection_service():
     return PotholeDetectionService()
 
 
-# Создаём Annotated тип для удобства
 PotholeServiceDep = Annotated[PotholeDetectionService, Depends(get_pothole_detection_service)]
 
 

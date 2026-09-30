@@ -95,7 +95,6 @@ const stopCamera = () => {
   }
 }
 
-// Сделать снимок
 const capturePhoto = () => {
   if (!videoElement.value || !mediaStream.value) {
     throw new Error('Камера не активна');
@@ -110,11 +109,6 @@ const capturePhoto = () => {
   return canvas.toDataURL();
 }
 
-const startVideo = async () => {
-  const stream = await navigator.mediaDevices.getUserMedia({
-    //когда-нибудь потом
-  })
-}
 onMounted(() => {
   renderCamera();
 })

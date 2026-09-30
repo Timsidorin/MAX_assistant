@@ -1,4 +1,4 @@
-from typing import AsyncGenerator, Annotated
+from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -32,7 +32,6 @@ UserServiceDep = Annotated[UserService, Depends(get_user_service)]
 ReportServiceDep = Annotated[ReportService, Depends(get_report_service)]
 
 
-# ===== Singleton Services (без DB) =====
 _email_service = None
 _document_service = None
 _gigachat_service = None

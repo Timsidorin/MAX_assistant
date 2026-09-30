@@ -52,8 +52,6 @@ class VideoBase64Input(BaseModel):
     filename: Optional[str] = Field(None, description="Название файла (опционально)")
 
 
-# ============== МОДЕЛИ ОТВЕТОВ ==============
-
 class SeverityStats(BaseModel):
     """Статистика по уровням опасности"""
     CRITICAL: int = 0

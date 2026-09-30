@@ -1,6 +1,5 @@
 import { useRef, useCallback, useState } from 'react';
 
-// Хук для открытия диалога выбора файлов (в проекте есть reactuse, но он еще test coverage, поэтому написал свой)
 export function useFileDialog(options = {}) {
     const {
         accept = '*/*',

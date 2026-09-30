@@ -1267,7 +1267,6 @@ dependencies = [
     { name = "opencv-python" },
     { name = "opencv-python-headless" },
     { name = "orjson" },
-    { name = "pdfkit" },
     { name = "pillow" },
     { name = "pydantic" },
     { name = "pydantic-core" },
@@ -1281,7 +1280,6 @@ dependencies = [
     { name = "torch" },
     { name = "torchvision" },
     { name = "ultralytics" },
-    { name = "uuid" },
     { name = "uvicorn" },
     { name = "websockets" },
 ]
@@ -1306,7 +1304,6 @@ requires-dist = [
     { name = "opencv-python", specifier = "==4.12.0.88" },
     { name = "opencv-python-headless", specifier = "==4.12.0.88" },
     { name = "orjson", specifier = "==3.11.4" },
-    { name = "pdfkit", specifier = ">=1.0.0" },
     { name = "pillow", specifier = "==12.0.0" },
     { name = "pydantic", specifier = "==2.12.3" },
     { name = "pydantic-core", specifier = "==2.41.4" },
@@ -1320,7 +1317,6 @@ requires-dist = [
     { name = "torch", specifier = "==2.9.0+cpu", index = "https://download.pytorch.org/whl/cpu" },
     { name = "torchvision", specifier = "==0.24.0+cpu", index = "https://download.pytorch.org/whl/cpu" },
     { name = "ultralytics", specifier = "==8.3.227" },
-    { name = "uuid", specifier = ">=1.30" },
     { name = "uvicorn", specifier = "==0.38.0" },
     { name = "websockets", specifier = "==15.0.1" },
 ]
@@ -1630,15 +1626,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/7d/fa/3944b40b07da9ce895c0e6303a5ab7d53da063554f534556b134a54d6093/packaging-26.3.tar.gz", hash = "sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79", size = 313412, upload-time = "2026-08-04T18:15:28.737Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl", hash = "sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c", size = 129956, upload-time = "2026-08-04T18:15:27.159Z" },
-]
-
-[[package]]
-name = "pdfkit"
-version = "1.0.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/58/bb/6ddc62b4622776a6514fd749041c2b4bccd343e006d00de590f8090ac8b1/pdfkit-1.0.0.tar.gz", hash = "sha256:992f821e1e18fc8a0e701ecae24b51a2d598296a180caee0a24c0af181da02a9", size = 13288, upload-time = "2021-11-14T19:28:51.672Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/64/1b/26c080096dd93936dccfd32c682bed3d5630a84aae9d493ff68afb2ae0fb/pdfkit-1.0.0-py3-none-any.whl", hash = "sha256:a7a4ca0d978e44fa8310c4909f087052430a6e8e0b1dd7ceef657f139789f96f", size = 12099, upload-time = "2021-11-14T19:28:50.44Z" },
 ]
 
 [[package]]
@@ -2353,12 +2340,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/e3/05/b17359e1cefb4f909
 wheels = [
     { url = "https://files.pythonhosted.org/packages/92/9d/c4e665119135114480843e7ab388fa94d8480650450e6f8e26b70d323a4c/urllib3-2.8.0-py3-none-any.whl", hash = "sha256:0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3", size = 135717, upload-time = "2026-09-15T19:29:34.577Z" },
 ]
-
-[[package]]
-name = "uuid"
-version = "1.30"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/ce/63/f42f5aa951ebf2c8dac81f77a8edcc1c218640a2a35a03b9ff2d4aa64c3d/uuid-1.30.tar.gz", hash = "sha256:1f87cc004ac5120466f36c5beae48b4c48cc411968eed0eaecd3da82aa96193f", size = 5811, upload-time = "2007-05-26T11:13:24Z" }
 
 [[package]]
 name = "uvicorn"

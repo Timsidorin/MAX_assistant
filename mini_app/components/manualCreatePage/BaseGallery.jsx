@@ -80,7 +80,6 @@ export default function BaseGallery({ images, setPhotos, deletePhoto }) {
         <>
             <div className={styles.galleryScrollContainer}>
                 <Flex gap={16} wrap="wrap" justify="center" className={styles.galleryContainer}>
-                    {/* Кнопка добавления новой фотографии */}
                     {images.length === 10 ? '' : <div
                         className={styles.addImageItem}
                         onClick={addPhotos}
@@ -89,7 +88,6 @@ export default function BaseGallery({ images, setPhotos, deletePhoto }) {
                         <span className={styles.addImageText}>Добавить фото</span>
                     </div>}
 
-                    {/* Существующие фотографии */}
                     {images.map((image) => (
                         <div
                             key={image.id}
@@ -147,7 +145,6 @@ export default function BaseGallery({ images, setPhotos, deletePhoto }) {
                             ›
                         </button>
 
-                        {/* Кнопка удаления */}
                         <button
                             className={styles.deleteButton}
                             onClick={handleDelete}

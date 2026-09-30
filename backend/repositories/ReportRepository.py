@@ -32,7 +32,7 @@ class ReportRepository:
     async def delete(self, report: Report) -> None:
         """Удалить отчет"""
         await self.db.delete(report)
-        await self.db.commit()  # <-- ИЗМЕНЕНО с flush на commit
+        await self.db.commit()
 
 
     async def get_list(

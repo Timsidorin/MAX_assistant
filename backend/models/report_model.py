@@ -1,4 +1,3 @@
-# report_model.py
 from sqlalchemy import String, Text, DateTime, Enum, ForeignKey, Float, Integer, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import UUID

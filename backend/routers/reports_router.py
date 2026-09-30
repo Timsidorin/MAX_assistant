@@ -1,11 +1,9 @@
-# backend/routers/reports_router.py
-
-from fastapi import APIRouter, Depends, Query, BackgroundTasks
-from typing import Optional, Annotated
 import uuid
+from typing import List, Optional
+
+from fastapi import APIRouter, BackgroundTasks, Query
 
 from backend.depends import ReportServiceDep
-from typing import List
 
 from backend.schemas.report_schema import (
     ReportCreateDraft, ReportUpdate,

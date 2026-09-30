@@ -1,10 +1,9 @@
-# backend/routers/users_router.py
-
-from fastapi import APIRouter, Depends, HTTPException, Path, Query
-from typing import Optional, List, Annotated
+from typing import List, Optional
 from uuid import UUID
 
-from backend.depends import UserServiceDep, AsyncSessionDep
+from fastapi import APIRouter, HTTPException, Path, Query
+
+from backend.depends import UserServiceDep
 from backend.schemas.users_schema import UserResponse, LeaderboardResponse, UserRankResponse
 
 users_router = APIRouter(

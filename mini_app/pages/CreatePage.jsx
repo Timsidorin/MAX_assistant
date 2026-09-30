@@ -20,6 +20,7 @@ export function CreatePage() {
                     name='Сканер'
                     icon={<FiCamera size={24}/>}
                     style={{flex: 1}}
+                    className="scanner-entry-highlight"
                     onAction={linkScanner}
                 />
                 <ButtonNavigation
@@ -36,7 +37,6 @@ export function CreatePage() {
 }
 
 function linkScanner() {
-    //пока в максе нет доступа к камере и gps делаем так
     const webApp = window.WebApp;
     const userId = webApp?.initDataUnsafe?.user?.id;
     const scannerUrl = `${__BASE__SCANNER__URL__}?user_id=${userId ?? ''}`;

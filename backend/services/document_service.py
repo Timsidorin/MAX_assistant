@@ -90,7 +90,6 @@ class DocumentService:
                 temp_docx.flush()
             temp_pdf_path = temp_docx_path.replace('.docx', '.pdf')
             print(f"[Document Service] Converting {temp_docx_path} -> {temp_pdf_path}")
-            # Удалён аргумент timeout, так как docx2pdf его не поддерживает
             convert(temp_docx_path, temp_pdf_path)
 
             if not os.path.exists(temp_pdf_path):

@@ -34,7 +34,7 @@ class PotholeDetectionService:
 
         self.conf_threshold = 0.15
         self.iou_threshold = 0.5
-        self.imgsz = 1280  # 640
+        self.imgsz = 1280
 
     def _load_model(self):
         """Загрузка YOLO11 модели"""
@@ -105,7 +105,6 @@ class PotholeDetectionService:
         if self.model is None:
             raise HTTPException(status_code=500, detail="YOLO11 модель не загружена")
 
-        # Декодирование изображения
         image = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_COLOR)
         if image is None:
             raise HTTPException(status_code=400, detail="Ошибка при загрузке изображения")
@@ -145,7 +144,7 @@ class PotholeDetectionService:
 
 
         if results.boxes is not None and len(results.boxes) > 0:
-            boxes = results.boxes.xyxy.cpu().numpy()  # x1, y1, x2, y2
+            boxes = results.boxes.xyxy.cpu().numpy()
             confidences = results.boxes.conf.cpu().numpy()
 
             for box, conf in zip(boxes, confidences):

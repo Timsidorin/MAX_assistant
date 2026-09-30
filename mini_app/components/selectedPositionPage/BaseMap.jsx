@@ -27,7 +27,6 @@ export function BaseMap() {
             hash: true,
         });
 
-        // Создаем маркер после загрузки карты
         map.current.on('load', () => {
             createMarker();
             setIsMapLoaded(true);
@@ -41,11 +40,9 @@ export function BaseMap() {
         };
     }, []);
 
-    // Функция для обновления позиции
     const updatePosition = useCallback((newPosition) => {
         setSelectedPosition(newPosition);
 
-        // Перемещаем центр карты
         if (map.current) {
             map.current.flyTo({
                 center: newPosition,
@@ -53,11 +50,9 @@ export function BaseMap() {
             });
         }
 
-        // Обновляем позицию маркера
         if (marker.current) {
             marker.current.setLngLat(newPosition);
         } else {
-            // Если маркера нет, создаем его
             createMarker(newPosition);
         }
     }, []);
@@ -81,7 +76,6 @@ export function BaseMap() {
         });
     }, [selectedPosition]);
 
-    // Обработчик выбора адреса
     const handleAddressSelect = useCallback((address) => {
         if (address.pin) {
             const newPosition = [address.pin[0], address.pin[1]];

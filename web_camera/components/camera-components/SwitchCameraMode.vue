@@ -11,10 +11,6 @@ let options = [
     value: 'photo',
     label: 'Фото'
   },
-  // {
-  //   value: 'video',
-  //   label: 'Видео'
-  // }
 ]
 </script>
 
