@@ -9,7 +9,6 @@ import aiohttp
 from fastapi import HTTPException, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.core.config import configs
 from backend.core.database import async_session_maker
 from backend.models.report_model import ReportStatus, ReportPriority, Report
 from backend.repositories.ReportRepository import ReportRepository
@@ -266,33 +265,30 @@ class ReportService:
             website = contacts.get("website")
             source = contacts.get("source") or "fallback"
 
-            if not email:
-                fallback_email = configs.FALLBACK_EMAIL
-                if fallback_email:
-                    logger.warning(
-                        f"[Task {task_id}] No email found for {organization_name}, "
-                        f"status={contacts.get('status')}. Using fallback email {fallback_email}"
-                    )
-                    email = fallback_email
-                    source = "fallback"
-                    report.contact_source = source
-                else:
-                    logger.warning(
-                        f"[Task {task_id}] No email found for {organization_name}, "
-                        f"status={contacts.get('status')}"
-                    )
-                    report.ai_agent_status = "manual"
-                    report.status = ReportStatus.IN_REVIEW
-                    report.comment = self._build_manual_comment(organization_name, phone, website)
-                    await repository.update(report)
-                    await self._notify_manual(report)
-                    return
-
             report.organization_name = organization_name
             report.organization_email = email
             report.organization_phone = phone
             report.organization_website = website
             report.contact_source = source
+
+            if not email:
+                channel_type = contacts.get("channel_type") or "manual"
+                logger.info(
+                    f"[Task {task_id}] Official channel selected for {organization_name}: "
+                    f"type={channel_type}, url={website}, source={source}"
+                )
+                report.ai_agent_status = "channel_found" if website else "manual"
+                report.status = ReportStatus.IN_REVIEW
+                report.comment = self._build_manual_comment(
+                    organization_name,
+                    phone,
+                    website,
+                    channel_type,
+                    contacts.get("reason"),
+                )
+                await repository.update(report)
+                await self._notify_manual(report, channel_type, contacts.get("reason"))
+                return
 
             person_name = await self._resolve_person_name(session, report.user_id)
             complaint_text = self.gigachat_service.generate_complaint_text(
@@ -368,25 +364,37 @@ class ReportService:
         organization_name: Optional[str],
         phone: Optional[str],
         website: Optional[str],
+        channel_type: str = "manual",
+        reason: Optional[str] = None,
     ) -> str:
         parts = [
-            f"Контакты найдены ({organization_name or 'организация не определена'}), "
-            "но email отсутствует."
+            f"Выбран канал {channel_type}: {organization_name or 'организация не определена'}."
         ]
+        if reason:
+            parts.append(f"Основание: {reason}")
         if phone:
             parts.append(f"Телефон: {phone}")
         if website:
-            parts.append(f"Сайт: {website}")
-        parts.append("Требуется ручная отправка.")
+            parts.append(f"Официальный канал: {website}")
+        parts.append("Автоматическая email-отправка не выполнялась.")
         return " ".join(parts)
 
-    async def _notify_manual(self, report: Report) -> None:
+    async def _notify_manual(
+        self,
+        report: Report,
+        channel_type: str = "manual",
+        reason: Optional[str] = None,
+    ) -> None:
         if not report.user_id:
             return
+        channel = report.organization_website or "канал не найден"
         msg = (
-            f"⚠️ По адресу «{report.address}» не удалось найти email для автоматической отправки.\n"
+            f"По адресу «{report.address}» найден официальный канал обращения.\n"
             f"Организация: {report.organization_name or 'не определена'}\n"
-            "Заявка сохранена и будет обработана вручную."
+            f"Тип канала: {channel_type}\n"
+            f"Ссылка: {channel}\n"
+            f"Основание маршрутизации: {reason or 'поиск ответственного дорожного органа'}\n"
+            "Email ведомства не подтверждён, поэтому письмо на случайный или резервный адрес не отправлялось."
         )
         await notify_user(report.user_id, msg)
 

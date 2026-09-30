@@ -1,6 +1,8 @@
+import ipaddress
 import json
 import os
 import re
+import socket
 import time
 from typing import Optional, Dict
 
@@ -136,36 +138,71 @@ class AIAgentService:
 
     def _search_gigachat_contacts(self, city: Optional[str], region: Optional[str], address: str) -> Optional[dict]:
         location = city or region or "город неизвестен"
-        prompt = f"""Какая организация отвечает за содержание дорог в населённом пункте {location} (адрес обращения: {address})?
+        prompt = f"""Определи владельца дороги и официальный канал подачи обращения о дефекте по адресу: {address}. Населённый пункт: {location}, регион: {region or 'неизвестен'}.
+
+Проверь последовательно муниципальный дорожный орган, региональное министерство или дорожное учреждение, а для федеральной дороги — территориальное ФКУ Упрдор Росавтодора. Не выбирай администрацию только потому, что найден её сайт.
 
 Верни ТОЛЬКО валидный JSON без пояснений и markdown:
-{{"organization": "полное название ведомства", "email": "email для обращений или null", "phone": "телефон или null", "website": "сайт или null"}}
+{{"organization": "полное название", "authority_level": "municipal|regional|federal|unknown", "channel_type": "email|web_form|public_portal|phone|manual", "email": "email или null", "phone": "телефон или null", "website": "официальная страница канала или null", "source_url": "официальная страница, подтверждающая контакт, или null", "reason": "краткое основание выбора"}}
 
 Правила:
-- email должен быть реальным рабочим адресом ведомства или null;
-- если email неизвестен точно — поставь null, НЕ выдумывай;
-- для маленьких городов обычно отвечает местная администрация или районное управление дорог.
-"""
-        return self._call_gigachat(prompt, source="gigachat")
-
-    def _search_gigachat_email(self, organization: str, city: Optional[str]) -> Optional[str]:
-        prompt = f"""Найди официальный email для обращений граждан в организацию "{organization}" в городе {city or 'Россия'}.
-
-Верни ТОЛЬКО валидный JSON без пояснений:
-{{"email": "email для обращений или null"}}
-
-Правила:
-- email должен быть реальным, опубликованным на официальном сайте;
-- если не уверен — поставь null, НЕ выдумывай;
-- приоритет: приёмная, канцелярия, обращения граждан.
+- email допустим только если он опубликован на указанной официальной странице source_url;
+- для обращения через форму верни channel_type=web_form и прямую ссылку на форму;
+- не придумывай email, домен, организацию или принадлежность дороги;
+- Росавтодор или ФКУ Упрдор выбирай только при признаках федеральной дороги;
+- если принадлежность дороги не установлена, выбери официальный региональный или федеральный портал обращений для маршрутизации, channel_type=public_portal;
+- если достоверного канала нет, channel_type=manual.
 """
         result = self._call_gigachat(prompt, source="gigachat")
-        if result:
-            email = result.get("email")
-            if email and re.fullmatch(EMAIL_PATTERN, email):
-                logger.info(f"GigaChat email found for {organization}: {email}")
-                return email
-        return None
+        if result and result.get("email"):
+            source_url = result.get("source_url")
+            if not source_url or not self._email_is_published(result["email"], source_url):
+                logger.warning(f"Rejected unverified GigaChat email for {result.get('organization')}")
+                result["email"] = None
+                if result.get("website"):
+                    result["channel_type"] = "web_form"
+        return result
+
+    def _search_gigachat_email(self, organization: str, city: Optional[str]) -> Optional[dict]:
+        prompt = f"""Найди официальный канал обращений граждан организации "{organization}" в городе {city or 'Россия'}.
+
+Верни ТОЛЬКО валидный JSON без пояснений:
+{{"email": "email или null", "website": "прямая ссылка на форму или null", "source_url": "официальная страница с контактом или null", "channel_type": "email|web_form|public_portal|phone|manual"}}
+
+Email указывай только вместе с официальной страницей source_url, на которой он опубликован. Если не уверен — null. Не генерируй адрес по домену.
+"""
+        result = self._call_gigachat(prompt, source="gigachat")
+        if not result:
+            return None
+        email = result.get("email")
+        source_url = result.get("source_url")
+        if email and source_url and self._email_is_published(email, source_url):
+            logger.info(f"Verified GigaChat email found for {organization}: {email}")
+            return result
+        result["email"] = None
+        return result
+
+    def _email_is_published(self, email: str, source_url: str) -> bool:
+        try:
+            if not re.fullmatch(EMAIL_PATTERN, email):
+                return False
+            url = httpx.URL(source_url)
+            host = (url.host or "").lower()
+            if (
+                url.scheme not in {"http", "https"}
+                or not host.endswith((".ru", ".рф"))
+                or url.port not in {None, 80, 443}
+                or url.userinfo
+            ):
+                return False
+            addresses = {item[4][0] for item in socket.getaddrinfo(host, None)}
+            if not addresses or any(not ipaddress.ip_address(address).is_global for address in addresses):
+                return False
+            response = httpx.get(source_url, timeout=REQUEST_TIMEOUT, follow_redirects=True)
+            return response.status_code == 200 and email.lower() in response.text.lower()
+        except Exception as e:
+            logger.warning(f"Official contact verification failed for {source_url}: {e}")
+            return False
 
     def _call_gigachat(self, prompt: str, source: str = "gigachat") -> Optional[dict]:
         try:
@@ -193,6 +230,10 @@ class AIAgentService:
                 "email": email,
                 "phone": data.get("phone"),
                 "website": data.get("website"),
+                "source_url": data.get("source_url"),
+                "authority_level": data.get("authority_level", "unknown"),
+                "channel_type": data.get("channel_type", "manual"),
+                "reason": data.get("reason"),
                 "source": source,
             }
         except Exception as e:
@@ -204,15 +245,19 @@ class AIAgentService:
 
         if not city and not region:
             return {
-                "success": False,
+                "success": True,
                 "city": None,
                 "region": None,
-                "organization": "Федеральное дорожное агентство (Росавтодор)",
+                "organization": "Платформа обратной связи Госуслуг",
                 "email": None,
-                "website": "https://rosavtodor.gov.ru",
-                "phone": "+7 (495) 995-50-55",
-                "status": "city_not_found",
-                "source": "fallback",
+                "website": "https://pos.gosuslugi.ru",
+                "phone": None,
+                "status": "public_portal",
+                "source": "official_federal_fallback",
+                "source_url": "https://pos.gosuslugi.ru",
+                "authority_level": "unknown",
+                "channel_type": "public_portal",
+                "reason": "Местоположение не определено; обращение требует маршрутизации через официальный государственный портал.",
             }
 
         cache_key = f"{city or ''}|{region or ''}"
@@ -245,22 +290,33 @@ class AIAgentService:
             source = "dadata"
 
         if giga:
-            organization = organization or giga.get("organization")
+            if giga.get("email") or giga.get("website"):
+                organization = giga.get("organization") or organization
+            else:
+                organization = organization or giga.get("organization")
             email = email or giga.get("email")
             phone = phone or giga.get("phone")
             website = website or giga.get("website")
             source = "dadata+gigachat" if dadata_result else "gigachat"
 
-        # 4. Если организация есть, но email нет — попробуем найти email через GigaChat по названию
+        # 4. Если организация есть, но email нет — попробуем найти официальный канал по названию
+        channel_type = giga.get("channel_type") if giga else None
+        authority_level = giga.get("authority_level") if giga else "unknown"
+        source_url = giga.get("source_url") if giga else None
+        reason = giga.get("reason") if giga else None
         if organization and not email:
-            email = self._search_gigachat_email(organization, city)
-            if email:
-                source = f"{source}+gigachat_email"
+            channel = self._search_gigachat_email(organization, city)
+            if channel:
+                email = channel.get("email")
+                website = website or channel.get("website")
+                source_url = source_url or channel.get("source_url")
+                channel_type = channel.get("channel_type") or channel_type
+                source = f"{source}+gigachat_channel"
 
         if not organization:
-            organization = f"Управление дорожной деятельности {city or region}"
+            organization = f"Дорожный орган по адресу: {city or region}"
 
-        if email:
+        if email or website:
             data = {
                 "success": True,
                 "city": city,
@@ -269,23 +325,30 @@ class AIAgentService:
                 "email": email,
                 "website": website,
                 "phone": phone,
-                "status": "found",
+                "status": "email_found" if email else channel_type or "web_form",
                 "source": source,
+                "source_url": source_url,
+                "authority_level": authority_level,
+                "channel_type": "email" if email else channel_type or "web_form",
+                "reason": reason,
             }
             self._cache[cache_key] = {"ts": time.time(), "data": data}
             return data
 
-        # 6. Федеральный fallback
         return {
-            "success": False,
+            "success": True,
             "city": city,
             "region": region,
-            "organization": organization,
+            "organization": "Платформа обратной связи Госуслуг",
             "email": None,
-            "website": website or "https://rosavtodor.gov.ru",
-            "phone": phone or "+7 (495) 995-50-55",
-            "status": "email_not_found",
-            "source": source,
+            "website": "https://pos.gosuslugi.ru",
+            "phone": None,
+            "status": "public_portal",
+            "source": "official_federal_fallback",
+            "source_url": "https://pos.gosuslugi.ru",
+            "authority_level": "unknown",
+            "channel_type": "public_portal",
+            "reason": "Владелец дороги достоверно не определён; обращение должно быть маршрутизировано компетентному ведомству через официальный государственный портал.",
         }
 
 
