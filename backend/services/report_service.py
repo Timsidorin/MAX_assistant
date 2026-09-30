@@ -274,7 +274,8 @@ class ReportService:
                         f"status={contacts.get('status')}. Using fallback email {fallback_email}"
                     )
                     email = fallback_email
-                    report.contact_source = f"{source}_fallback"
+                    source = "fallback"
+                    report.contact_source = source
                 else:
                     logger.warning(
                         f"[Task {task_id}] No email found for {organization_name}, "
@@ -333,7 +334,10 @@ class ReportService:
                 report.status = ReportStatus.IN_REVIEW
                 report.comment = f"Заявление отправлено на {email} с {len(photo_attachments)} фото"
                 await repository.update(report)
-                await self._notify_sent(report, organization_name)
+                if source == "fallback":
+                    await self._notify_fallback_sent(report, organization_name, contacts)
+                else:
+                    await self._notify_sent(report, organization_name)
                 logger.info(f"[Task {task_id}] Successfully sent to {email}")
             else:
                 report.ai_agent_status = "failed"
@@ -393,6 +397,25 @@ class ReportService:
             f"✅ Готово! Заявление о дефектах по адресу «{report.address}» "
             f"отправлено в «{organization_name}».\n"
             "Очки ямоборца уже начислены — проверь профиль 🏆"
+        )
+        await notify_user(report.user_id, msg)
+
+    async def _notify_fallback_sent(
+        self,
+        report: Report,
+        organization_name: str,
+        contacts: dict,
+    ) -> None:
+        if not report.user_id:
+            return
+        website = contacts.get("website") or "сайт не найден"
+        phone = contacts.get("phone") or "телефон не найден"
+        msg = (
+            f"✅ Заявление по адресу «{report.address}» сохранено.\n"
+            f"Найдена организация: «{organization_name}».\n"
+            f"Официальный email ведомства в открытых источниках не обнаружен.\n"
+            f"Контакты: {website}, {phone}.\n"
+            "Заявление направлено на резервный канал для дальнейшей маршрутизации."
         )
         await notify_user(report.user_id, msg)
 

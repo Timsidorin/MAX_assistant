@@ -3,7 +3,6 @@ import os
 import re
 import time
 from typing import Optional, Dict
-from urllib.parse import urlparse
 
 import httpx
 from dotenv import load_dotenv
@@ -33,22 +32,6 @@ PARTY_QUERIES = [
     "благоустройство {city}",
     "ЖКХ {city}",
 ]
-
-
-def _normalize_domain(value: Optional[str]) -> str:
-    if not value:
-        return ""
-    parsed = urlparse(value)
-    netloc = parsed.netloc or parsed.path or value
-    return netloc.lower().replace("www.", "")
-
-
-def _extract_domain(value: Optional[str]) -> str:
-    domain = _normalize_domain(value)
-    if not domain:
-        return ""
-    parts = domain.split("/")
-    return parts[0]
 
 
 class AIAgentService:
@@ -180,6 +163,7 @@ class AIAgentService:
         if result:
             email = result.get("email")
             if email and re.fullmatch(EMAIL_PATTERN, email):
+                logger.info(f"GigaChat email found for {organization}: {email}")
                 return email
         return None
 
@@ -214,20 +198,6 @@ class AIAgentService:
         except Exception as e:
             logger.warning(f"GigaChat contact search failed: {e}")
             return None
-
-    def _guess_email(self, organization: str, website: Optional[str], city: Optional[str]) -> Optional[str]:
-        """Последняя эвристика: типовые email на основе домена сайта."""
-        domain = _extract_domain(website)
-        if not domain:
-            return None
-
-        aliases = ["info", "reception", "priemnaya", "udd", "dorogi", "kancelyariya", "obrashcheniya", "gorod"]
-        for alias in aliases:
-            candidate = f"{alias}@{domain}"
-            if re.fullmatch(EMAIL_PATTERN, candidate):
-                logger.info(f"Email guessed from website: {candidate}")
-                return candidate
-        return None
 
     def find_road_agency_contacts(self, address: str, coordinates: Optional[dict] = None) -> dict:
         city, region = self._extract_city_and_region(address)
@@ -286,12 +256,6 @@ class AIAgentService:
             email = self._search_gigachat_email(organization, city)
             if email:
                 source = f"{source}+gigachat_email"
-
-        # 5. Эвристика по домену сайта
-        if not email and website:
-            email = self._guess_email(organization or "", website, city)
-            if email:
-                source = f"{source}+guessed"
 
         if not organization:
             organization = f"Управление дорожной деятельности {city or region}"
