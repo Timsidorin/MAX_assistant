@@ -86,6 +86,7 @@ class AIAgentService:
         if not DADATA_API_KEY:
             return None
 
+        first_candidate = None
         for template in PARTY_QUERIES:
             query = template.format(city=city or "", region=region or city or "")
             if not query.strip():
@@ -130,11 +131,13 @@ class AIAgentService:
                         f"DaData party: {result['organization']} email={result['email']} "
                         f"phone={result['phone']}"
                     )
-                    return result
+                    if result["email"]:
+                        return result
+                    first_candidate = first_candidate or result
             except Exception as e:
                 logger.warning(f"DaData party suggest failed for '{query}': {e}")
 
-        return None
+        return first_candidate
 
     def _search_gigachat_contacts(self, city: Optional[str], region: Optional[str], address: str) -> Optional[dict]:
         location = city or region or "город неизвестен"
@@ -146,8 +149,9 @@ class AIAgentService:
 {{"organization": "полное название", "authority_level": "municipal|regional|federal|unknown", "channel_type": "email|web_form|public_portal|phone|manual", "email": "email или null", "phone": "телефон или null", "website": "официальная страница канала или null", "source_url": "официальная страница, подтверждающая контакт, или null", "reason": "краткое основание выбора"}}
 
 Правила:
+- приоритет отдавай официальному email приёмной или канцелярии, опубликованному на source_url;
 - email допустим только если он опубликован на указанной официальной странице source_url;
-- для обращения через форму верни channel_type=web_form и прямую ссылку на форму;
+- возвращай web_form только если подходящего официального email действительно нет, и указывай прямую ссылку на форму, а не главную страницу сайта;
 - не придумывай email, домен, организацию или принадлежность дороги;
 - Росавтодор или ФКУ Упрдор выбирай только при признаках федеральной дороги;
 - если принадлежность дороги не установлена, выбери официальный региональный или федеральный портал обращений для маршрутизации, channel_type=public_portal;
@@ -159,8 +163,15 @@ class AIAgentService:
             if not source_url or not self._email_is_published(result["email"], source_url):
                 logger.warning(f"Rejected unverified GigaChat email for {result.get('organization')}")
                 result["email"] = None
-                if result.get("website"):
-                    result["channel_type"] = "web_form"
+        if result and result.get("website"):
+            verified_url = self._reachable_official_page(result["website"])
+            if verified_url:
+                result["website"] = verified_url
+            else:
+                logger.warning(f"Rejected unreachable web form: {result['website']}")
+                result["website"] = None
+                if not result.get("email"):
+                    result["channel_type"] = "manual"
         return result
 
     def _search_gigachat_email(self, organization: str, city: Optional[str]) -> Optional[dict]:
@@ -178,9 +189,31 @@ Email указывай только вместе с официальной ст�
         source_url = result.get("source_url")
         if email and source_url and self._email_is_published(email, source_url):
             logger.info(f"Verified GigaChat email found for {organization}: {email}")
-            return result
-        result["email"] = None
+        else:
+            result["email"] = None
+        if result.get("website"):
+            result["website"] = self._reachable_official_page(result["website"])
         return result
+
+    def _reachable_official_page(self, page_url: str) -> Optional[str]:
+        candidates = [page_url]
+        if page_url.startswith("http://"):
+            candidates.insert(0, page_url.replace("http://", "https://", 1))
+        for candidate in candidates:
+            try:
+                url = httpx.URL(candidate)
+                host = (url.host or "").lower()
+                if url.scheme not in {"http", "https"} or not host.endswith((".ru", ".рф")):
+                    continue
+                addresses = {item[4][0] for item in socket.getaddrinfo(host, None)}
+                if not addresses or any(not ipaddress.ip_address(address).is_global for address in addresses):
+                    continue
+                response = httpx.get(candidate, timeout=REQUEST_TIMEOUT, follow_redirects=True)
+                if response.status_code < 400:
+                    return str(response.url)
+            except Exception as e:
+                logger.warning(f"Official page verification failed for {candidate}: {e}")
+        return None
 
     def _email_is_published(self, email: str, source_url: str) -> bool:
         try:
