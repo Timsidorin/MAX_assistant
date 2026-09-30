@@ -36,6 +36,7 @@ class Configs(BaseSettings):
     YANDEX_SMTP_USER: str = Field(default="", env="YANDEX_SMTP_USER")
     YANDEX_SMTP_PASSWORD: str = Field(default="", env="YANDEX_SMTP_PASSWORD")
     EMAIL_FROM_NAME: str = Field(default="Ямоборец", env="EMAIL_FROM_NAME")
+    FALLBACK_EMAIL: Optional[str] = Field(default=None, env="FALLBACK_EMAIL")
 
 
     model_config = SettingsConfigDict(

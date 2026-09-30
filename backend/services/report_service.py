@@ -9,6 +9,7 @@ import aiohttp
 from fastapi import HTTPException, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.core.config import configs
 from backend.core.database import async_session_maker
 from backend.models.report_model import ReportStatus, ReportPriority, Report
 from backend.repositories.ReportRepository import ReportRepository
@@ -265,23 +266,32 @@ class ReportService:
             website = contacts.get("website")
             source = contacts.get("source") or "fallback"
 
+            if not email:
+                fallback_email = configs.FALLBACK_EMAIL
+                if fallback_email:
+                    logger.warning(
+                        f"[Task {task_id}] No email found for {organization_name}, "
+                        f"status={contacts.get('status')}. Using fallback email {fallback_email}"
+                    )
+                    email = fallback_email
+                    report.contact_source = f"{source}_fallback"
+                else:
+                    logger.warning(
+                        f"[Task {task_id}] No email found for {organization_name}, "
+                        f"status={contacts.get('status')}"
+                    )
+                    report.ai_agent_status = "manual"
+                    report.status = ReportStatus.IN_REVIEW
+                    report.comment = self._build_manual_comment(organization_name, phone, website)
+                    await repository.update(report)
+                    await self._notify_manual(report)
+                    return
+
             report.organization_name = organization_name
             report.organization_email = email
             report.organization_phone = phone
             report.organization_website = website
             report.contact_source = source
-
-            if not email:
-                logger.warning(
-                    f"[Task {task_id}] No email found for {organization_name}, "
-                    f"status={contacts.get('status')}"
-                )
-                report.ai_agent_status = "manual"
-                report.status = ReportStatus.IN_REVIEW
-                report.comment = self._build_manual_comment(organization_name, phone, website)
-                await repository.update(report)
-                await self._notify_manual(report)
-                return
 
             person_name = await self._resolve_person_name(session, report.user_id)
             complaint_text = self.gigachat_service.generate_complaint_text(
