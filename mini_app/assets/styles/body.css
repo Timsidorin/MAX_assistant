@@ -1,3 +1,53 @@
 :root {
     color-scheme: light dark;
 }
+
+.navigation-button-shell {
+    min-width: 0;
+}
+
+.scanner-entry-highlight {
+    position: relative;
+    padding: 2px;
+    border: 2px solid #007aff;
+    border-radius: 18px;
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+    animation: scanner-focus 1.8s ease-in-out 3;
+}
+
+.scanner-entry-highlight::after {
+    content: "";
+    position: absolute;
+    inset: -7px;
+    pointer-events: none;
+    border: 2px solid #007aff;
+    border-radius: 22px;
+    animation: scanner-ring 1.8s ease-out 3;
+}
+
+@keyframes scanner-focus {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.025);
+    }
+}
+
+@keyframes scanner-ring {
+    0% {
+        opacity: 0.8;
+        transform: scale(0.98);
+    }
+    70%, 100% {
+        opacity: 0;
+        transform: scale(1.08);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .scanner-entry-highlight,
+    .scanner-entry-highlight::after {
+        animation: none;
+    }
+}

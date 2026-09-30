@@ -1,17 +1,16 @@
 import {ToolButton, Typography} from "@maxhub/max-ui";
 
-export function ButtonNavigation(props) {
+export function ButtonNavigation({name, icon, onAction, className = '', style}) {
     return (
-        <ToolButton
-            onClick={() => {
-                props.onAction();
-            }}
-            appearance="secondary"
-            icon={props.icon}
-        >
-            <Typography.Action>
-                {props.name}
-            </Typography.Action>
-        </ToolButton>
-    )
+        <div className={`navigation-button-shell ${className}`.trim()} style={style}>
+            <ToolButton
+                onClick={onAction}
+                appearance="secondary"
+                icon={icon}
+                style={{width: '100%'}}
+            >
+                <Typography.Action>{name}</Typography.Action>
+            </ToolButton>
+        </div>
+    );
 }
