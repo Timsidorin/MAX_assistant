@@ -121,6 +121,10 @@ class Report(Base):
         )
 
     @property
+    def document_url(self) -> Optional[str]:
+        return self.image_urls.get("document_url") if isinstance(self.image_urls, dict) else None
+
+    @property
     def auto_priority(self) -> ReportPriority:
         critical_count = self.critical_count or 0
         high_count = self.high_count or 0

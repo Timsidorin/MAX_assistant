@@ -42,6 +42,11 @@ class ReportCreateDraft(BaseModel):
     description: Optional[str] = None
 
 
+class ExternalSubmissionConfirm(BaseModel):
+    user_id: int
+    registration_number: Optional[str] = None
+
+
 class ReportUpdate(BaseModel):
     latitude: Optional[str] = None
     longitude: Optional[str] = None
@@ -90,6 +95,7 @@ class ReportResponse(BaseModel):
     contact_source: Optional[str] = None
     ai_agent_task_id: Optional[str] = None
     ai_agent_status: Optional[str] = None
+    document_url: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -112,7 +118,10 @@ class ReportListItem(BaseModel):
     submitted_at: Optional[datetime] = None
     organization_name: Optional[str] = None
     organization_email: Optional[str] = None
+    organization_website: Optional[str] = None
+    contact_source: Optional[str] = None
     ai_agent_status: Optional[str] = None
+    document_url: Optional[str] = None
 
     class Config:
         from_attributes = True

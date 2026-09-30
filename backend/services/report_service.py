@@ -13,6 +13,7 @@ from backend.core.database import async_session_maker
 from backend.models.report_model import ReportStatus, ReportPriority, Report
 from backend.repositories.ReportRepository import ReportRepository
 from backend.schemas.report_schema import (
+    ExternalSubmissionConfirm,
     ReportCreateDraft,
     ReportDraftCreatedResponse,
     ReportGeoPoint,
@@ -271,13 +272,40 @@ class ReportService:
             report.organization_website = website
             report.contact_source = source
 
+            person_name = await self._resolve_person_name(session, report.user_id)
+            file_bytes, file_ext = self.document_service.create_complaint_document(
+                city=contacts.get("city", ""),
+                street=self._extract_street(report.address),
+                organization_name=organization_name,
+                person_name=person_name,
+                count_photos=self._count_photos(report),
+                year=datetime.now().year,
+                convert_to_pdf=True,
+            )
+            if not file_bytes:
+                raise ValueError("Generated document is empty")
+
             if not email:
                 channel_type = contacts.get("channel_type") or "manual"
                 logger.info(
                     f"[Task {task_id}] Official channel selected for {organization_name}: "
                     f"type={channel_type}, url={website}, source={source}"
                 )
-                report.ai_agent_status = "channel_found" if website else "manual"
+                document_url = await LocalStorageService().upload_file(
+                    file_bytes,
+                    folder="complaints",
+                    filename=f"zayavlenie_{report.uuid}.{file_ext}",
+                    content_type=(
+                        "application/pdf"
+                        if file_ext == "pdf"
+                        else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    ),
+                    base_url=self._public_base_url(report),
+                )
+                stored_media = dict(report.image_urls or {})
+                stored_media["document_url"] = document_url
+                report.image_urls = stored_media
+                report.ai_agent_status = "awaiting_user_submission" if website else "manual"
                 report.status = ReportStatus.IN_REVIEW
                 report.comment = self._build_manual_comment(
                     organization_name,
@@ -290,7 +318,6 @@ class ReportService:
                 await self._notify_manual(report, channel_type, contacts.get("reason"))
                 return
 
-            person_name = await self._resolve_person_name(session, report.user_id)
             complaint_text = self.gigachat_service.generate_complaint_text(
                 city=contacts.get("city", "Неизвестно"),
                 address=report.address,
@@ -300,18 +327,6 @@ class ReportService:
                 priority=report.priority.value,
                 person_name=person_name,
             )
-
-            file_bytes, file_ext = self.document_service.create_complaint_document(
-                city=contacts.get("city", ""),
-                street=self._extract_street(report.address),
-                organization_name=organization_name,
-                person_name=person_name,
-                count_photos=self._count_photos(report),
-                year=datetime.now().year,
-                convert_to_pdf=True,
-            )
-            if not file_bytes:
-                raise ValueError("Generated document is empty")
 
             photo_attachments = await self._download_photos(report)
             attachments = [(f"zayavlenie.{file_ext}", file_bytes)]
@@ -387,16 +402,20 @@ class ReportService:
     ) -> None:
         if not report.user_id:
             return
-        channel = report.organization_website or "канал не найден"
         msg = (
-            f"По адресу «{report.address}» найден официальный канал обращения.\n"
+            f"Заявление по адресу «{report.address}» подготовлено.\n"
             f"Организация: {report.organization_name or 'не определена'}\n"
             f"Тип канала: {channel_type}\n"
-            f"Ссылка: {channel}\n"
-            f"Основание маршрутизации: {reason or 'поиск ответственного дорожного органа'}\n"
-            "Email ведомства не подтверждён, поэтому письмо на случайный или резервный адрес не отправлялось."
+            f"Основание маршрутизации: {reason or 'поиск ответственного дорожного органа'}\n\n"
+            "Скачайте заявление, откройте официальную приёмную, прикрепите документ и фотографии. "
+            "После подачи подтвердите отправку в разделе заявок."
         )
-        await notify_user(report.user_id, msg)
+        links = []
+        if report.document_url:
+            links.append(("Скачать заявление", report.document_url))
+        if report.organization_website:
+            links.append(("Открыть приёмную", report.organization_website))
+        await notify_user(report.user_id, msg, links=links)
 
     async def _notify_sent(self, report: Report, organization_name: str) -> None:
         if not report.user_id:
@@ -494,6 +513,13 @@ class ReportService:
 
         return urls
 
+    def _public_base_url(self, report: Report) -> str:
+        for url in self._collect_photo_urls(report):
+            parsed = urlparse(url)
+            if parsed.scheme in {"http", "https"} and parsed.netloc:
+                return f"{parsed.scheme}://{parsed.netloc}"
+        return ""
+
     def _count_photos(self, report: Report) -> int:
         return len(self._collect_photo_urls(report))
 
@@ -540,7 +566,10 @@ class ReportService:
                 submitted_at=r.submitted_at,
                 organization_name=r.organization_name,
                 organization_email=r.organization_email,
+                organization_website=r.organization_website,
+                contact_source=r.contact_source,
                 ai_agent_status=r.ai_agent_status,
+                document_url=r.document_url,
             )
             for r in reports
         ]
@@ -572,6 +601,32 @@ class ReportService:
     async def get_stats(self) -> ReportStatsResponse:
         stats = await self.repository.get_stats()
         return ReportStatsResponse(**stats)
+
+    async def confirm_external_submission(
+        self,
+        report_uuid: uuid.UUID,
+        data: ExternalSubmissionConfirm,
+    ) -> ReportResponse:
+        report = await self.repository.get_by_uuid(report_uuid)
+        if not report:
+            raise HTTPException(status_code=404, detail="Заявка не найдена")
+        if report.user_id != data.user_id:
+            raise HTTPException(status_code=403, detail="Заявка принадлежит другому пользователю")
+        if report.ai_agent_status != "awaiting_user_submission":
+            raise HTTPException(status_code=400, detail="Заявка не ожидает подтверждения отправки")
+
+        report.ai_agent_status = "user_submitted"
+        details = "Пользователь подтвердил отправку через официальную приёмную."
+        if data.registration_number:
+            details += f" Регистрационный номер: {data.registration_number.strip()}"
+        report.comment = f"{report.comment or ''} {details}".strip()
+        await self.repository.update(report)
+        if report.user_id:
+            await notify_user(
+                report.user_id,
+                "Отправка обращения подтверждена. Сохраните регистрационный номер и ответ ведомства.",
+            )
+        return ReportResponse.model_validate(report)
 
     async def confirm_report(self, report_uuid: uuid.UUID) -> dict:
         report = await self.repository.get_by_uuid(report_uuid)

@@ -1,7 +1,7 @@
 import React, {useEffect, useState} from 'react';
 import styles from '../../../assets/styles/module/TickedCard.module.css';
 import {Typography} from "@maxhub/max-ui";
-import {getTicket} from "@api/ticket.js";
+import {confirmExternalSubmission, getTicket} from "@api/ticket.js";
 import {Button} from "@maxhub/max-ui";
 import {useNavigate} from "react-router";
 import {BaseLoader} from "@components/ui/BaseLoader.jsx";
@@ -50,13 +50,22 @@ const RiskMeter = ({ risk }) => {
     );
 };
 
-function TickedCardView({ticket, navigate}) {
+function TickedCardView({ticket, navigate, onSubmitted}) {
     const formatDate = (dateString) => {
         return new Date(dateString).toLocaleDateString('ru-RU', {
             day: 'numeric',
             month: 'short',
             year: 'numeric'
         });
+    };
+
+    const confirmSubmission = async () => {
+        const registrationNumber = window.prompt('Введите регистрационный номер обращения, если он есть') || null;
+        await confirmExternalSubmission(ticket.uuid, {
+            user_id: window.WebApp?.initDataUnsafe?.user?.id,
+            registration_number: registrationNumber,
+        });
+        onSubmitted(ticket.uuid);
     };
 
     return (
@@ -109,15 +118,31 @@ function TickedCardView({ticket, navigate}) {
                     >
                         📋 Сформировать отчет
                     </Button>
+                ) : ticket.ai_agent_status === 'awaiting_user_submission' ? (
+                    <div className={styles.submittedInfo}>
+                        <span className={styles.submittedBadge}>Требуется подача через приёмную</span>
+                        {ticket.organization_name && <span>{ticket.organization_name}</span>}
+                        {ticket.document_url && (
+                            <Button size='small' mode='secondary' onClick={() => window.open(ticket.document_url, '_blank')}>
+                                Скачать заявление
+                            </Button>
+                        )}
+                        {ticket.organization_website && (
+                            <Button size='small' mode='secondary' onClick={() => window.open(ticket.organization_website, '_blank')}>
+                                Открыть приёмную
+                            </Button>
+                        )}
+                        <Button size='small' mode='primary' onClick={confirmSubmission}>
+                            Я отправил
+                        </Button>
+                    </div>
                 ) : (
                     <div className={styles.submittedInfo}>
-            <span className={styles.submittedBadge}>
-              ✅ Отчет отправлен
-            </span>
+                        <span className={styles.submittedBadge}>
+                            {ticket.ai_agent_status === 'user_submitted' ? 'Отправка подтверждена' : 'Отчет отправлен'}
+                        </span>
                         {ticket.submitted_at && (
-                            <span className={styles.submittedDate}>
-                {formatDate(ticket.submitted_at)}
-              </span>
+                            <span className={styles.submittedDate}>{formatDate(ticket.submitted_at)}</span>
                         )}
                     </div>
                 )}
@@ -151,6 +176,12 @@ export function TickedCardContainer() {
         fetchTicket();
     }, []);
 
+    const markSubmitted = (uuid) => {
+        setTickets((current) => current.map((ticket) => (
+            ticket.uuid === uuid ? {...ticket, ai_agent_status: 'user_submitted'} : ticket
+        )));
+    };
+
     if (loading) {
         return <BaseLoader style={{ width: '100%' }} />;
     }
@@ -159,7 +190,12 @@ export function TickedCardContainer() {
         <div className={styles.cardsContainer}>
             {tickets && tickets.length > 0 ? (
                 tickets.map((ticket) => (
-                    <TickedCardView navigate={navigate} key={ticket.uuid} ticket={ticket}/>
+                    <TickedCardView
+                        navigate={navigate}
+                        onSubmitted={markSubmitted}
+                        key={ticket.uuid}
+                        ticket={ticket}
+                    />
                 ))
             ) : (
                 <div className={styles.emptyState}>

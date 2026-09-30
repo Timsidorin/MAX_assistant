@@ -11,7 +11,7 @@ from backend.schemas.report_schema import (
     ReportCreateDraft, ReportUpdate,
     ReportDraftCreatedResponse, ReportResponse, ReportListResponse,
     ReportSubmitResponse, ReportStatusEnum, ReportPriorityEnum,
-    ReportGeoPoint, ReportStatsResponse
+    ReportGeoPoint, ReportStatsResponse, ExternalSubmissionConfirm
 )
 
 report_router = APIRouter(prefix="/api/reports", tags=["Заявки"])
@@ -48,6 +48,19 @@ async def submit_report(
     3. Отслеживать статус
     """
     return await report_service.submit_report(report_uuid, background_tasks)
+
+
+@report_router.post(
+    "/{report_uuid}/confirm-external-submission",
+    response_model=ReportResponse,
+    summary="Подтвердить отправку через официальную приёмную"
+)
+async def confirm_external_submission(
+    report_uuid: uuid.UUID,
+    payload: ExternalSubmissionConfirm,
+    report_service: ReportServiceDep = None,
+):
+    return await report_service.confirm_external_submission(report_uuid, payload)
 
 
 @report_router.get(
