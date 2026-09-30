@@ -10,6 +10,7 @@ import os
 import sys
 
 from max_bot.main import dp, bot
+from backend.core.database import Base, engine
 from backend.services.external_services.local_storage_service import MEDIA_ROOT, MEDIA_URL_PREFIX
 
 logger.remove()
@@ -46,6 +47,13 @@ def create_base_app(configs):
     async def lifespan(app: FastAPI) -> AsyncGenerator[dict, None]:
         """Управление жизненным циклом приложения."""
         logger.info("Инициализация приложения...")
+
+        logger.info("Создание таблиц БД при необходимости...")
+        from backend.models.users_model import User
+        from backend.models.report_model import Report
+        from backend.models.tasks_model import Task
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
 
         model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'cv_models', 'best.pt'))
         if os.path.isfile(model_path):

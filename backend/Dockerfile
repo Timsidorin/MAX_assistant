@@ -17,4 +17,4 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 EXPOSE 8005
 
-CMD ["sh", "-c", "alembic -c backend/alembic/alembic.ini upgrade head && uvicorn backend.main:app --host 0.0.0.0 --port 8005"]
+CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port 8005"]
