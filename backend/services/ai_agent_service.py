@@ -1,12 +1,4 @@
-"""
-AI Agent Service - поиск контактов дорожных служб без браузера.
-
-Пайплайн:
-1. DaData: парсинг адреса -> город (suggest/address)
-2. DaData: поиск организации по городу (suggest/party) -> email/телефон/сайт
-3. GigaChat: fallback-генерация JSON с контактами ведомства
-4. Статичный fallback: портал "Решаем вместе" / Росавтодор
-"""
+"""Поиск контактов дорожных служб: DaData -> GigaChat -> fallback."""
 
 import json
 import os
@@ -53,8 +45,6 @@ class AIAgentService:
             self._gigachat = GigaChatService()
         return self._gigachat
 
-    # ---------- Шаг 1: адрес -> город ----------
-
     def _extract_city(self, address: str) -> Optional[str]:
         """Извлекает город из адреса через DaData, regex как fallback."""
         if DADATA_API_KEY:
@@ -81,8 +71,6 @@ class AIAgentService:
 
         match = re.search(r"г\s+([А-Яа-яЁё\s\-]+?)(?=\s*,|\s+край|\s+область|$)", address, re.IGNORECASE)
         return match.group(1).strip() if match else None
-
-    # ---------- Шаг 2: DaData party ----------
 
     def _search_party_contacts(self, city: str) -> Optional[dict]:
         """Ищет дорожную организацию через DaData party suggestions."""
@@ -128,8 +116,6 @@ class AIAgentService:
 
         return None
 
-    # ---------- Шаг 3: GigaChat ----------
-
     def _search_gigachat(self, city: str, address: str) -> Optional[dict]:
         """Просит GigaChat вернуть контакты дорожной службы в JSON."""
         prompt = f"""Какая организация отвечает за состояние дорог в городе {city} (адрес обращения: {address})?
@@ -166,8 +152,6 @@ class AIAgentService:
         except Exception as e:
             logger.warning(f"GigaChat contact search failed: {e}")
             return None
-
-    # ---------- Основная функция ----------
 
     def find_road_agency_contacts(self, address: str, coordinates: Optional[dict] = None) -> dict:
         """Находит контакты дорожной службы: DaData -> GigaChat -> fallback."""

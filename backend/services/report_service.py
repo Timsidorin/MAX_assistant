@@ -1,70 +1,115 @@
+from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlparse
-import aiohttp
-from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import HTTPException, BackgroundTasks
 from typing import Optional, List
-from datetime import datetime
-import uuid
+from urllib.parse import urlparse
 import logging
+import uuid
 
-from backend.core.config import configs
-from backend.core.database import async_session_maker  # Импортируем session_maker
+import aiohttp
+from fastapi import HTTPException, BackgroundTasks
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from backend.core.database import async_session_maker
 from backend.models.report_model import ReportStatus, ReportPriority, Report
-from backend.schemas.report_schema import (
-    ReportCreateDraft, ReportUpdate,
-    ReportDraftCreatedResponse, ReportResponse, ReportSubmitResponse,
-    ReportListResponse, ReportListItem, ReportGeoPoint, ReportStatsResponse
-)
-
 from backend.repositories.ReportRepository import ReportRepository
+from backend.schemas.report_schema import (
+    ReportCreateDraft,
+    ReportDraftCreatedResponse,
+    ReportGeoPoint,
+    ReportListResponse,
+    ReportListItem,
+    ReportResponse,
+    ReportStatsResponse,
+    ReportSubmitResponse,
+    ReportUpdate,
+)
 from backend.services.ai_agent_service import find_road_agency_contacts
-from backend.services.users_service import UserService
-from backend.services.external_services.email_service import EmailService
-from backend.services.external_services.gigachat_service import GigaChatService
-from backend.services.external_services.geo_service import GeocodingService
-from backend.services.external_services.local_storage_service import LocalStorageService
 from backend.services.document_service import DocumentService
+from backend.services.external_services.email_service import EmailService
+from backend.services.external_services.geo_service import GeocodingService
+from backend.services.external_services.gigachat_service import GigaChatService
+from backend.services.external_services.local_storage_service import LocalStorageService
 from backend.services.notification_service import notify_user
-from backend.schemas.users_schema import UserUpdate
+from backend.services.users_service import UserService
 
 logger = logging.getLogger(__name__)
+
+
+POINTS_BY_PRIORITY = {
+    ReportPriority.LOW: 10,
+    ReportPriority.MEDIUM: 20,
+    ReportPriority.HIGH: 50,
+    ReportPriority.CRITICAL: 100,
+}
 
 
 class ReportService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.repository = ReportRepository(db)
-        # Инициализируем singleton сервисы как атрибуты класса
-        self._email_service = None
-        self._document_service = None
-        self._gigachat_service = None
+        self._email_service: Optional[EmailService] = None
+        self._document_service: Optional[DocumentService] = None
+        self._gigachat_service: Optional[GigaChatService] = None
 
     @property
     def email_service(self) -> EmailService:
-        """Lazy init для EmailService"""
         if self._email_service is None:
             self._email_service = EmailService()
         return self._email_service
 
     @property
     def document_service(self) -> DocumentService:
-        """Lazy init для DocumentService"""
         if self._document_service is None:
             self._document_service = DocumentService()
         return self._document_service
 
     @property
     def gigachat_service(self) -> GigaChatService:
-        """Lazy init для GigaChatService"""
         if self._gigachat_service is None:
             self._gigachat_service = GigaChatService()
         return self._gigachat_service
 
     async def create_draft(self, data: ReportCreateDraft) -> ReportDraftCreatedResponse:
-        """Создать черновик заявки"""
-        latitude = data.latitude
-        longitude = data.longitude
+        latitude, longitude = await self._normalize_coordinates(
+            data.latitude, data.longitude, data.address
+        )
+
+        report = Report(
+            user_id=data.user_id,
+            latitude=latitude,
+            longitude=longitude,
+            address=data.address,
+            description=data.description,
+            status=ReportStatus.DRAFT,
+            image_url=data.image_url,
+            image_urls={"urls": data.image_urls} if data.image_urls else None,
+            video_url=data.video_url,
+            total_potholes=data.total_potholes,
+            average_risk=data.average_risk,
+            max_risk=data.max_risk,
+            critical_count=data.detections.CRITICAL if data.detections else 0,
+            high_count=data.detections.HIGH if data.detections else 0,
+            medium_count=data.detections.MEDIUM if data.detections else 0,
+            low_count=data.detections.LOW if data.detections else 0,
+        )
+        report.priority = report.auto_priority
+        report = await self.repository.create(report)
+
+        logger.info(f"Draft report created: {report.uuid}, can_submit={report.can_be_submitted}")
+        return ReportDraftCreatedResponse(
+            uuid=report.uuid,
+            status=report.status.value,
+            priority=report.priority.value,
+            can_be_submitted=report.can_be_submitted,
+            message="Черновик заявки создан",
+        )
+
+    async def _normalize_coordinates(
+        self,
+        latitude: Optional[str],
+        longitude: Optional[str],
+        address: Optional[str],
+    ) -> tuple[Optional[str], Optional[str]]:
         try:
             coordinates_missing = not latitude or not longitude or (
                 float(latitude) == 0 and float(longitude) == 0
@@ -72,91 +117,23 @@ class ReportService:
         except (TypeError, ValueError):
             coordinates_missing = True
 
-        if coordinates_missing:
-            resolved_coordinates = await GeocodingService().geocode_address(data.address) if data.address else None
-            if resolved_coordinates:
-                latitude, longitude = resolved_coordinates
-            else:
-                latitude, longitude = None, None
+        if not coordinates_missing:
+            return latitude, longitude
 
-        report = Report()
-        report.user_id = data.user_id
-        report.latitude = latitude
-        report.longitude = longitude
-        report.address = data.address
-        report.description = data.description
-        report.status = ReportStatus.DRAFT
-        report.image_url = data.image_url
+        if not address:
+            return None, None
 
-        if data.image_urls:
-            report.image_urls = {"urls": data.image_urls}
-
-        report.video_url = data.video_url
-        report.total_potholes = data.total_potholes
-        report.average_risk = data.average_risk
-        report.max_risk = data.max_risk
-
-        if data.detections:
-            report.critical_count = data.detections.CRITICAL
-            report.high_count = data.detections.HIGH
-            report.medium_count = data.detections.MEDIUM
-            report.low_count = data.detections.LOW
-
-        report.priority = report.auto_priority
-        report = await self.repository.create(report)
-
-        can_submit = bool(
-            report.status == ReportStatus.DRAFT and
-            report.address and
-            (report.image_url or report.image_urls or report.video_url)
-        )
-
-        logger.info(f"Draft report created: {report.uuid}, can_submit={can_submit}")
-        return ReportDraftCreatedResponse(
-            uuid=report.uuid,
-            status=report.status.value,
-            priority=report.priority.value,
-            can_be_submitted=can_submit,
-            message="Черновик заявки создан"
-        )
+        resolved = await GeocodingService().geocode_address(address)
+        return resolved if resolved else (None, None)
 
     async def get_by_uuid(self, report_uuid: uuid.UUID) -> ReportResponse:
-        """Получить заявку по UUID"""
         report = await self.repository.get_by_uuid(report_uuid)
         if not report:
             logger.warning(f"Report {report_uuid} not found")
             raise HTTPException(status_code=404, detail="Заявка не найдена")
+        return ReportResponse.model_validate(report)
 
-        return ReportResponse(
-            uuid=report.uuid,
-            user_id=report.user_id,
-            latitude=report.latitude,
-            longitude=report.longitude,
-            address=report.address,
-            image_url=report.image_url,
-            image_urls=report.image_urls,
-            video_url=report.video_url,
-            total_potholes=report.total_potholes,
-            average_risk=report.average_risk,
-            max_risk=report.max_risk,
-            critical_count=report.critical_count,
-            high_count=report.high_count,
-            medium_count=report.medium_count,
-            low_count=report.low_count,
-            status=report.status.value,
-            priority=report.priority.value,
-            confirmations=report.confirmations or 0,
-            description=report.description,
-            comment=report.comment,
-            created_at=report.created_at,
-        )
-
-    async def update_draft(
-            self,
-            report_uuid: uuid.UUID,
-            data: ReportUpdate
-    ) -> ReportResponse:
-        """Обновить черновик заявки"""
+    async def update_draft(self, report_uuid: uuid.UUID, data: ReportUpdate) -> ReportResponse:
         report = await self.repository.get_by_uuid(report_uuid)
         if not report:
             logger.warning(f"Report {report_uuid} not found for update")
@@ -166,7 +143,7 @@ class ReportService:
             logger.warning(f"Cannot edit report {report_uuid} with status {report.status.value}")
             raise HTTPException(
                 status_code=400,
-                detail=f"Нельзя редактировать заявку со статусом {report.status.value}"
+                detail=f"Нельзя редактировать заявку со статусом {report.status.value}",
             )
 
         update_data = data.model_dump(exclude_unset=True)
@@ -181,8 +158,11 @@ class ReportService:
         logger.info(f"Report {report_uuid} updated successfully")
         return await self.get_by_uuid(report_uuid)
 
-    async def submit_report(self, report_uuid: uuid.UUID, background_tasks: BackgroundTasks) -> ReportSubmitResponse:
-        """Отправка заявки с генерацией текста и отправкой email."""
+    async def submit_report(
+        self,
+        report_uuid: uuid.UUID,
+        background_tasks: BackgroundTasks,
+    ) -> ReportSubmitResponse:
         report = await self.repository.get_by_uuid(report_uuid)
         if not report:
             logger.warning(f"Report {report_uuid} not found for submission")
@@ -193,38 +173,21 @@ class ReportService:
             logger.warning(f"Report {report_uuid} already submitted with status {report.status.value}")
             raise HTTPException(
                 status_code=400,
-                detail=f"Заявка уже отправлена. Текущий статус: {report.status.value}"
+                detail=f"Заявка уже отправлена. Текущий статус: {report.status.value}",
             )
 
-        can_submit = report.can_be_submitted
-        if not can_submit:
+        if not report.can_be_submitted:
             logger.warning(f"Report {report_uuid} not ready for submission")
             raise HTTPException(
                 status_code=400,
-                detail="Заявка не готова к отправке. Заполните все обязательные поля."
+                detail="Заявка не готова к отправке. Заполните все обязательные поля.",
             )
 
         report.status = ReportStatus.SUBMITTED
         if not is_retry:
-            report.submitted_at = datetime.now()
+            report.submitted_at = datetime.now(timezone.utc)
 
-        if report.user_id and not is_retry:
-            try:
-                user_service = UserService(self.db)
-                points_awarded = {
-                    ReportPriority.LOW: 10,
-                    ReportPriority.MEDIUM: 20,
-                    ReportPriority.HIGH: 50,
-                    ReportPriority.CRITICAL: 100
-                }.get(report.priority, 10)
-
-                updated_user = await user_service.update_user_points(report.user_id, points_awarded)
-                if updated_user:
-                    logger.info(f"User {report.user_id} awarded {points_awarded} points for report {report_uuid}")
-                else:
-                    logger.warning(f"Failed to update points for user {report.user_id}")
-            except Exception as e:
-                logger.error(f"Error updating user {report.user_id} points: {e}", exc_info=True)
+        await self._award_points(report)
 
         task_id = str(uuid.uuid4())
         report.ai_agent_task_id = task_id
@@ -236,13 +199,13 @@ class ReportService:
             await notify_user(
                 report.user_id,
                 f"📨 Заявка по адресу «{report.address}» принята в обработку!\n"
-                f"Приоритет: {report.priority.value}. Ищем контакты ответственной организации…"
+                f"Приоритет: {report.priority.value}. Ищем контакты ответственной организации…",
             )
 
         background_tasks.add_task(
             self._process_and_send_complaint_wrapper,
             report_uuid=report.uuid,
-            task_id=task_id
+            task_id=task_id,
         )
 
         return ReportSubmitResponse(
@@ -251,14 +214,25 @@ class ReportService:
             priority=report.priority.value,
             message="Заявка принята в обработку. Производится поиск контактов и генерация текста.",
             ai_agent_task_id=task_id,
-            estimated_processing_time=60
+            estimated_processing_time=60,
         )
 
-    async def _process_and_send_complaint_wrapper(self, report_uuid: uuid.UUID, task_id: str):
-        """
-        Wrapper для фоновой задачи - создаёт новую сессию БД.
-        Это необходимо, так как фоновые задачи выполняются вне контекста запроса.
-        """
+    async def _award_points(self, report: Report) -> None:
+        if not report.user_id:
+            return
+
+        points = POINTS_BY_PRIORITY.get(report.priority, 10)
+        try:
+            user_service = UserService(self.db)
+            updated_user = await user_service.update_user_points(report.user_id, points)
+            if updated_user:
+                logger.info(f"User {report.user_id} awarded {points} points for report {report.uuid}")
+            else:
+                logger.warning(f"Failed to update points for user {report.user_id}")
+        except Exception as e:
+            logger.error(f"Error updating user {report.user_id} points: {e}", exc_info=True)
+
+    async def _process_and_send_complaint_wrapper(self, report_uuid: uuid.UUID, task_id: str) -> None:
         async with async_session_maker() as session:
             try:
                 await self._process_and_send_complaint(session, report_uuid, task_id)
@@ -269,216 +243,242 @@ class ReportService:
             finally:
                 await session.close()
 
-    async def _process_and_send_complaint(self, session: AsyncSession, report_uuid: uuid.UUID, task_id: str):
-        """Фоновая обработка: поиск контактов, генерация, отправка с фото."""
+    async def _process_and_send_complaint(
+        self,
+        session: AsyncSession,
+        report_uuid: uuid.UUID,
+        task_id: str,
+    ) -> None:
+        repository = ReportRepository(session)
+        report = await repository.get_by_uuid(report_uuid)
+        if not report:
+            logger.error(f"[Task {task_id}] Report {report_uuid} not found")
+            return
+
         try:
-            logger.info(f"[Task {task_id}] Starting background processing for report {report_uuid}")
-
-            # Создаём новый repository с новой сессией
-            repository = ReportRepository(session)
-            report = await repository.get_by_uuid(report_uuid)
-
-            if not report:
-                logger.error(f"[Task {task_id}] Report {report_uuid} not found")
-                return
-
-            # Step 1: Find contacts
             logger.info(f"[Task {task_id}] Finding contacts for address: {report.address}")
-            contacts_result = find_road_agency_contacts(report.address)
+            contacts = find_road_agency_contacts(report.address)
 
-            organization_name = contacts_result.get('organization') or 'Управление дорожной деятельности'
-            contact_email = contacts_result.get('email')
-            email_to = "timofeisidorin@vk.com"  # For testing
-            # email_to = contact_email  # Production
-
-            if not contact_email:
-                logger.warning(
-                    f"[Task {task_id}] Organization resolved without email; "
-                    f"using test recipient, status={contacts_result.get('status')}"
-                )
+            organization_name = contacts.get("organization") or "Управление дорожной деятельности"
+            email = contacts.get("email")
+            phone = contacts.get("phone")
+            website = contacts.get("website")
+            source = contacts.get("source") or "fallback"
 
             report.organization_name = organization_name
-            await repository.update(report)
-            logger.info(f"[Task {task_id}] Found email: {email_to}, organization: {organization_name}")
+            report.organization_email = email
+            report.organization_phone = phone
+            report.organization_website = website
+            report.contact_source = source
 
-            # Step 2: Get user name
-            person_name = "Заявитель"
-            if report.user_id:
-                try:
-                    user_service = UserService(session)
-                    user = await user_service.get_user_by_max_user_id(report.user_id)
-                    if user and user.first_name and user.last_name:
-                        person_name = f"{user.first_name} {user.last_name}"
-                    logger.debug(f"[Task {task_id}] User name: {person_name}")
-                except Exception as e:
-                    logger.error(f"[Task {task_id}] Error getting user data: {e}", exc_info=True)
+            if not email:
+                logger.warning(
+                    f"[Task {task_id}] No email found for {organization_name}, "
+                    f"status={contacts.get('status')}"
+                )
+                report.ai_agent_status = "manual"
+                report.status = ReportStatus.IN_REVIEW
+                report.comment = self._build_manual_comment(organization_name, phone, website)
+                await repository.update(report)
+                await self._notify_manual(report)
+                return
 
-            # Step 3: Generate complaint text
-            logger.info(f"[Task {task_id}] Generating complaint text")
+            person_name = await self._resolve_person_name(session, report.user_id)
             complaint_text = self.gigachat_service.generate_complaint_text(
-                city=contacts_result.get('city', 'Неизвестно'),
+                city=contacts.get("city", "Неизвестно"),
                 address=report.address,
                 description=report.description or "Обнаружены дефекты дорожного покрытия",
                 total_potholes=report.total_potholes,
                 max_risk=report.max_risk,
                 priority=report.priority.value,
-                person_name=person_name
+                person_name=person_name,
             )
 
-            # Step 4: Create document
-            logger.info(f"[Task {task_id}] Creating complaint document")
-            street = self._extract_street(report.address)
             file_bytes, file_ext = self.document_service.create_complaint_document(
-                city=contacts_result.get("city", ""),
-                street=street,
+                city=contacts.get("city", ""),
+                street=self._extract_street(report.address),
                 organization_name=organization_name,
                 person_name=person_name,
                 count_photos=self._count_photos(report),
                 year=datetime.now().year,
-                convert_to_pdf=True
+                convert_to_pdf=True,
             )
-
-            if len(file_bytes) == 0:
+            if not file_bytes:
                 raise ValueError("Generated document is empty")
-            logger.info(f"[Task {task_id}] Document created: {len(file_bytes)} bytes")
 
-            # Step 5: Download photos
-            logger.info(f"[Task {task_id}] Downloading photos")
             photo_attachments = await self._download_photos(report)
             attachments = [(f"zayavlenie.{file_ext}", file_bytes)]
             attachments.extend(photo_attachments)
-            logger.info(f"[Task {task_id}] Total attachments: {len(attachments)}")
 
-            # Step 6: Send email
-            logger.info(f"[Task {task_id}] Sending email to {email_to}")
-            subject = f"Заявление о дефектах дорожного покрытия - {report.address}"
+            logger.info(f"[Task {task_id}] Sending email to {email}")
             success = self.email_service.send_complaint_email(
-                to_email=email_to,
-                subject=subject,
+                to_email=email,
+                subject=f"Заявление о дефектах дорожного покрытия - {report.address}",
                 body_text=complaint_text,
-                attachments=attachments
+                attachments=attachments,
             )
 
             if success:
                 report.ai_agent_status = "completed"
                 report.status = ReportStatus.IN_REVIEW
-                report.comment = f"Заявление отправлено на {email_to} с {len(photo_attachments)} фото"
-                logger.info(f"[Task {task_id}] Successfully sent to {email_to}")
-                if report.user_id:
-                    await notify_user(
-                        report.user_id,
-                        f"✅ Готово! Заявление о дефектах по адресу «{report.address}» "
-                        f"отправлено в «{organization_name}».\n"
-                        f"Очки ямоборца уже начислены — проверь профиль 🏆"
-                    )
+                report.comment = f"Заявление отправлено на {email} с {len(photo_attachments)} фото"
+                await repository.update(report)
+                await self._notify_sent(report, organization_name)
+                logger.info(f"[Task {task_id}] Successfully sent to {email}")
             else:
                 report.ai_agent_status = "failed"
                 report.comment = "Ошибка при отправке email"
+                await repository.update(report)
+                await self._notify_failed(report, "не удалось отправить письмо")
                 logger.error(f"[Task {task_id}] Failed to send email")
-                if report.user_id:
-                    await notify_user(
-                        report.user_id,
-                        f"⚠️ Не удалось отправить заявление по адресу «{report.address}». "
-                        f"Попробуйте повторить позже."
-                    )
-
-            await repository.update(report)
 
         except Exception as e:
             logger.error(f"[Task {task_id}] Error processing report {report_uuid}: {e}", exc_info=True)
-            try:
-                repository = ReportRepository(session)
-                report = await repository.get_by_uuid(report_uuid)
-                if report:
-                    report.ai_agent_status = "failed"
-                    report.comment = f"Ошибка: {str(e)}"
-                    await repository.update(report)
-                    if report.user_id:
-                        await notify_user(
-                            report.user_id,
-                            f"Не удалось завершить обработку заявки по адресу «{report.address}». "
-                            f"Заявка сохранена, повторите отправку позже."
-                        )
-            except Exception as update_error:
-                logger.error(f"[Task {task_id}] Failed to update report status: {update_error}", exc_info=True)
+            await self._mark_failed(repository, report, str(e))
+
+    async def _resolve_person_name(self, session: AsyncSession, user_id: Optional[int]) -> str:
+        if not user_id:
+            return "Заявитель"
+
+        try:
+            user_service = UserService(session)
+            user = await user_service.get_user_by_max_user_id(user_id)
+            if user and user.first_name and user.last_name:
+                return f"{user.first_name} {user.last_name}"
+        except Exception as e:
+            logger.error(f"Error getting user data: {e}", exc_info=True)
+        return "Заявитель"
+
+    def _build_manual_comment(
+        self,
+        organization_name: Optional[str],
+        phone: Optional[str],
+        website: Optional[str],
+    ) -> str:
+        parts = [
+            f"Контакты найдены ({organization_name or 'организация не определена'}), "
+            "но email отсутствует."
+        ]
+        if phone:
+            parts.append(f"Телефон: {phone}")
+        if website:
+            parts.append(f"Сайт: {website}")
+        parts.append("Требуется ручная отправка.")
+        return " ".join(parts)
+
+    async def _notify_manual(self, report: Report) -> None:
+        if not report.user_id:
+            return
+        msg = (
+            f"⚠️ По адресу «{report.address}» не удалось найти email для автоматической отправки.\n"
+            f"Организация: {report.organization_name or 'не определена'}\n"
+            "Заявка сохранена и будет обработана вручную."
+        )
+        await notify_user(report.user_id, msg)
+
+    async def _notify_sent(self, report: Report, organization_name: str) -> None:
+        if not report.user_id:
+            return
+        msg = (
+            f"✅ Готово! Заявление о дефектах по адресу «{report.address}» "
+            f"отправлено в «{organization_name}».\n"
+            "Очки ямоборца уже начислены — проверь профиль 🏆"
+        )
+        await notify_user(report.user_id, msg)
+
+    async def _notify_failed(self, report: Report, reason: str) -> None:
+        if not report.user_id:
+            return
+        msg = (
+            f"⚠️ Не удалось отправить заявление по адресу «{report.address}»: {reason}. "
+            "Попробуйте повторить позже."
+        )
+        await notify_user(report.user_id, msg)
+
+    async def _mark_failed(
+        self,
+        repository: ReportRepository,
+        report: Report,
+        reason: str,
+    ) -> None:
+        report.ai_agent_status = "failed"
+        report.comment = f"Ошибка: {reason}"
+        try:
+            await repository.update(report)
+        except Exception as update_error:
+            logger.error(f"Failed to update report status: {update_error}", exc_info=True)
+        if report.user_id:
+            await self._notify_failed(report, "внутренняя ошибка обработки")
 
     async def _download_photos(self, report: Report) -> List[tuple]:
-        """Скачивает все фотографии из report.image_urls."""
-        photo_attachments = []
-        photo_urls = []
+        photo_urls = self._collect_photo_urls(report)
+        if not photo_urls:
+            return []
 
-        if report.image_url:
-            photo_urls.append(report.image_url)
-
-        if report.image_urls and isinstance(report.image_urls, dict):
-            if 'urls' in report.image_urls:
-                photo_urls.extend(report.image_urls['urls'])
-        elif isinstance(report.image_urls, list):
-            photo_urls.extend(report.image_urls)
-
-        logger.info(f"Found {len(photo_urls)} photo URLs to download")
         local_storage = LocalStorageService()
+        photo_attachments = []
 
         async with aiohttp.ClientSession() as session:
             for idx, url in enumerate(photo_urls, 1):
                 try:
                     parsed_url = urlparse(url)
-                    file_ext = Path(parsed_url.path).suffix or '.jpg'
+                    file_ext = Path(parsed_url.path).suffix or ".jpg"
                     filename = f"photo_{idx}{file_ext}"
-                    content = await local_storage.read_file(url)
 
+                    content = await local_storage.read_file(url)
                     if content is None:
-                        logger.debug(f"Downloading external photo {idx}/{len(photo_urls)}: {url[:50]}...")
-                        async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response:
+                        async with session.get(
+                            url,
+                            timeout=aiohttp.ClientTimeout(total=30),
+                        ) as response:
                             response.raise_for_status()
                             content = await response.read()
 
                     photo_attachments.append((filename, content))
-                    logger.debug(f"Attached: {filename} ({len(content)} bytes)")
                 except Exception as e:
                     logger.warning(f"Failed to load photo {idx} from {url[:50]}: {e}")
-                    continue
 
-        logger.info(f"Successfully downloaded {len(photo_attachments)}/{len(photo_urls)} photos")
         return photo_attachments
 
-    def _count_photos(self, report: Report) -> int:
-        """Подсчитывает количество фотографий."""
-        count = 0
+    def _collect_photo_urls(self, report: Report) -> List[str]:
+        urls = []
         if report.image_url:
-            count += 1
-        if report.image_urls and isinstance(report.image_urls, dict):
-            if 'urls' in report.image_urls:
-                count += len(report.image_urls['urls'])
-        elif isinstance(report.image_urls, list):
-            count += len(report.image_urls)
-        return count
+            urls.append(report.image_url)
+
+        stored = report.image_urls
+        if isinstance(stored, dict):
+            urls.extend(stored.get("urls") or [])
+        elif isinstance(stored, list):
+            urls.extend(stored)
+
+        return urls
+
+    def _count_photos(self, report: Report) -> int:
+        return len(self._collect_photo_urls(report))
 
     def _extract_street(self, address: str) -> str:
-        """Извлекает улицу из полного адреса."""
-        parts = address.split(',')
+        parts = address.split(",")
         street_parts = []
         for part in parts:
             part = part.strip()
-            if any(kw in part.lower() for kw in ['ул', 'пр', 'д', 'дом', 'корп']):
+            if any(kw in part.lower() for kw in ["ул", "пр", "д", "дом", "корп"]):
                 street_parts.append(part)
-        return ', '.join(street_parts) if street_parts else address
+        return ", ".join(street_parts) if street_parts else address
 
     async def get_list(
-            self,
-            user_id: Optional[int] = None,
-            status: Optional[ReportStatus] = None,
-            priority: Optional[ReportPriority] = None,
-            skip: int = 0,
-            limit: int = 50
+        self,
+        user_id: Optional[int] = None,
+        status: Optional[ReportStatus] = None,
+        priority: Optional[ReportPriority] = None,
+        skip: int = 0,
+        limit: int = 50,
     ) -> ReportListResponse:
-        """Получить список заявок с фильтрацией"""
         reports, total = await self.repository.get_list(
             user_id=user_id,
             status=status,
             priority=priority,
             skip=skip,
-            limit=limit
+            limit=limit,
         )
 
         items = [
@@ -495,7 +495,11 @@ class ReportService:
                 created_at=r.created_at,
                 image_url=r.image_url,
                 image_urls=r.image_urls,
-                video_url=r.video_url
+                video_url=r.video_url,
+                submitted_at=r.submitted_at,
+                organization_name=r.organization_name,
+                organization_email=r.organization_email,
+                ai_agent_status=r.ai_agent_status,
             )
             for r in reports
         ]
@@ -504,7 +508,6 @@ class ReportService:
         return ReportListResponse(total=total, items=items)
 
     async def get_geo_list(self) -> List[ReportGeoPoint]:
-        """Список точек дефектов для карты"""
         reports = await self.repository.get_geo_list()
         points = []
         for r in reports:
@@ -526,12 +529,10 @@ class ReportService:
         return points
 
     async def get_stats(self) -> ReportStatsResponse:
-        """Сводная статистика по заявкам для тикера на карте"""
         stats = await self.repository.get_stats()
         return ReportStatsResponse(**stats)
 
     async def confirm_report(self, report_uuid: uuid.UUID) -> dict:
-        """Подтверждение дефекта другим пользователем ('я тоже тут видел')"""
         report = await self.repository.get_by_uuid(report_uuid)
         if not report:
             raise HTTPException(status_code=404, detail="Заявка не найдена")
@@ -549,7 +550,6 @@ class ReportService:
         }
 
     async def delete_draft(self, report_uuid: uuid.UUID) -> dict:
-        """Удалить черновик"""
         report = await self.repository.get_by_uuid(report_uuid)
         if not report:
             logger.warning(f"Report {report_uuid} not found for deletion")
@@ -559,12 +559,12 @@ class ReportService:
             logger.warning(f"Cannot delete non-draft report {report_uuid} with status {report.status.value}")
             raise HTTPException(
                 status_code=400,
-                detail="Можно удалять только черновики"
+                detail="Можно удалять только черновики",
             )
 
         await self.repository.delete(report)
         logger.info(f"Draft report {report_uuid} deleted")
         return {
             "message": "Черновик удален",
-            "uuid": str(report_uuid)
+            "uuid": str(report_uuid),
         }

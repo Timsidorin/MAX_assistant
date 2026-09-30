@@ -100,7 +100,7 @@ class UserService:
             }
 
         reports_repo = ReportRepository(self.session)
-        user_reports, _ = await reports_repo.get_list(userid=user.max_user_id, limit=1000)
+        user_reports, _ = await reports_repo.get_list(user_id=user.max_user_id, limit=1000)
 
         points_map = {
             ReportPriority.LOW: 10,

@@ -26,6 +26,13 @@ class ReportPriority(str, enum.Enum):
     CRITICAL = "critical"
 
 
+class ContactSource(str, enum.Enum):
+    DADATA = "dadata"
+    GIGACHAT = "gigachat"
+    FALLBACK = "fallback"
+    MANUAL = "manual"
+
+
 class Report(Base):
     __tablename__ = "reports"
 
@@ -83,6 +90,20 @@ class Report(Base):
         server_default=func.now(),
         nullable=False
     )
+
+    submitted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True
+    )
+
+    organization_name: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    organization_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    organization_phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    organization_website: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    contact_source: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    ai_agent_task_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    ai_agent_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
     def __repr__(self):
         return f"<Report(uuid={self.uuid}, status={self.status}, address={self.address})>"

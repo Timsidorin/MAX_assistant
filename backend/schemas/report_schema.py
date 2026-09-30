@@ -82,6 +82,14 @@ class ReportResponse(BaseModel):
     description: Optional[str]
     comment: Optional[str]
     created_at: datetime
+    submitted_at: Optional[datetime] = None
+    organization_name: Optional[str] = None
+    organization_email: Optional[str] = None
+    organization_phone: Optional[str] = None
+    organization_website: Optional[str] = None
+    contact_source: Optional[str] = None
+    ai_agent_task_id: Optional[str] = None
+    ai_agent_status: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -102,6 +110,9 @@ class ReportListItem(BaseModel):
     image_urls: Optional[Dict] = None
     video_url: Optional[str] = None
     submitted_at: Optional[datetime] = None
+    organization_name: Optional[str] = None
+    organization_email: Optional[str] = None
+    ai_agent_status: Optional[str] = None
 
     class Config:
         from_attributes = True

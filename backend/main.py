@@ -2,9 +2,8 @@
 Точка входа в backend
 """
 import logging
-from urllib.request import Request
 
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, Request
 from fastapi.exceptions import RequestValidationError
 from starlette import status
 from starlette.responses import JSONResponse
